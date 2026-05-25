@@ -1,0 +1,10 @@
+{
+  "name": "Player Development Portal",
+  "description": "An elite sports training and development network bridging Associations, Clubs, Teams, Coaches, and Players with real-time GPS tracking, performance metric dashboards, classroom learning, and coaching assignments.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,275 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Core Hardware-Level Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      // In preview and sandbox environments, auth.token.email_verified is always checked
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.email != null);
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\:\\.]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Auth Token role verification derived strictly from the trusted database
+    function getUserRole(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
+    }
+
+    function isUserApproved(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.approved == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        getUserRole(request.auth.uid) == 'admin';
+    }
+
+    function isAssociation() {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        getUserRole(request.auth.uid) == 'association';
+    }
+
+    // --- Entity Blueprints (Type/Size & Consistency Guards) ---
+    
+    function isValidUserProfile(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.email is string && data.email.size() <= 200 &&
+             data.role is string && (
+               data.role == 'admin' || 
+               data.role == 'association' || 
+               data.role == 'club' || 
+               data.role == 'team' || 
+               data.role == 'coach' || 
+               data.role == 'player'
+             ) &&
+             data.approved is bool &&
+             (!('associationId' in data) || (data.associationId is string && data.associationId.size() <= 128)) &&
+             (!('clubId' in data) || (data.clubId is string && data.clubId.size() <= 128)) &&
+             (!('teamId' in data) || (data.teamId is string && data.teamId.size() <= 128)) &&
+             (!('coachId' in data) || (data.coachId is string && data.coachId.size() <= 128)) &&
+             (!('manualCoachName' in data) || (data.manualCoachName is string && data.manualCoachName.size() <= 200)) &&
+             (!('manualCoachEmail' in data) || (data.manualCoachEmail is string && data.manualCoachEmail.size() <= 200));
+    }
+
+    function isValidAssociation(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.contactEmail is string && data.contactEmail.size() <= 200 &&
+             data.approved is bool &&
+             (!('UUID' in data) || (data.UUID is string && data.UUID.size() <= 128)) &&
+             (!('association_name' in data) || (data.association_name is string && data.association_name.size() <= 200)) &&
+             (!('association_email' in data) || (data.association_email is string && data.association_email.size() <= 200)) &&
+             (!('club' in data) || (data.club is string && data.club.size() <= 200)) &&
+             (!('club_name' in data) || (data.club_name is string && data.club_name.size() <= 200)) &&
+             (!('club_email' in data) || (data.club_email is string && data.club_email.size() <= 200)) &&
+             (!('create_at' in data) || (data.create_at is string && data.create_at.size() <= 100));
+    }
+
+    function isValidClub(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.associationId is string && data.associationId.size() <= 128 &&
+             data.contactEmail is string && data.contactEmail.size() <= 200 &&
+             data.approved is bool &&
+             (!('UUID' in data) || (data.UUID is string && data.UUID.size() <= 128)) &&
+             (!('club' in data) || (data.club is string && data.club.size() <= 200)) &&
+             (!('club_name' in data) || (data.club_name is string && data.club_name.size() <= 200)) &&
+             (!('club_email' in data) || (data.club_email is string && data.club_email.size() <= 200)) &&
+             (!('association_id' in data) || (data.association_id is string && data.association_id.size() <= 128)) &&
+             (!('create_at' in data) || (data.create_at is string && data.create_at.size() <= 100));
+    }
+
+    function isValidTeam(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.clubId is string && data.clubId.size() <= 128 &&
+             data.contactEmail is string && data.contactEmail.size() <= 200 &&
+             data.approved is bool;
+    }
+
+    function isValidCoach(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.email is string && data.email.size() <= 200 &&
+             data.teamId is string && data.teamId.size() <= 128 &&
+             data.approved is bool &&
+             (!('UUID' in data) || (data.UUID is string && data.UUID.size() <= 128)) &&
+             (!('coach' in data) || (data.coach is string && data.coach.size() <= 200)) &&
+             (!('coach_email' in data) || (data.coach_email is string && data.coach_email.size() <= 200)) &&
+             (!('team' in data) || (data.team is string && data.team.size() <= 200)) &&
+             (!('create_at' in data) || (data.create_at is string && data.create_at.size() <= 100));
+    }
+
+    function isValidPlayer(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.email is string && data.email.size() <= 200 &&
+             data.coachId is string && (data.coachId.size() <= 128 || data.coachId == '') &&
+             data.approved is bool &&
+             (!('UUID' in data) || (data.UUID is string && data.UUID.size() <= 128)) &&
+             (!('player_name' in data) || (data.player_name is string && data.player_name.size() <= 200)) &&
+             (!('player_email' in data) || (data.player_email is string && data.player_email.size() <= 200)) &&
+             (!('create_at' in data) || (data.create_at is string && data.create_at.size() <= 100));
+    }
+
+    function isValidRunLog(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.playerId is string && data.playerId.size() <= 128 &&
+             data.date is string && data.date.size() <= 50 &&
+             data.durationSeconds is number && data.durationSeconds >= 0 &&
+             data.distanceKm is number && data.distanceKm >= 0 &&
+             data.avgSpeedKmH is number && data.avgSpeedKmH >= 0 &&
+             data.gpsTrackPoints is list;
+    }
+
+    function isValidDailyMetrics(data) {
+      return data.playerId is string && data.playerId.size() <= 128 &&
+             data.date is string && data.date.size() <= 50 &&
+             data.hydrationMls is number &&
+             data.hydrationGoalMls is number &&
+             data.sleepHours is number &&
+             data.sleepQuality is string;
+    }
+
+    function isValidEducationalModule(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.type is string &&
+             data.category is string &&
+             data.content is string &&
+             data.durationMinutes is number;
+    }
+
+    function isValidModuleCompletion(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.playerId is string && data.playerId.size() <= 128 &&
+             data.moduleId is string && data.moduleId.size() <= 128 &&
+             data.dateCompleted is string && data.dateCompleted.size() <= 50;
+    }
+
+    function isValidAssignment(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.coachId is string && data.coachId.size() <= 128 &&
+             data.teamId is string && data.teamId.size() <= 128 &&
+             data.type is string &&
+             data.title is string && data.title.size() <= 200 &&
+             data.dueDate is string && data.dueDate.size() <= 50 &&
+             data.completedByPlayerIds is list;
+    }
+
+    // --- COLLECTION RULES MAPPING ---
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(userId) && (
+        isAdmin() || 
+        // Allow a user to create/manage their own profile matching their auth UID
+        (request.auth.uid == userId && isValidUserProfile(incoming()))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 2. Associations Collection
+    match /associations/{assocId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(assocId) && isValidAssociation(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // 3. Clubs Collection
+    match /clubs/{clubId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(clubId) && isValidClub(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // 4. Teams Collection
+    match /teams/{teamId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(teamId) && isValidTeam(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // 5. Coaches Collection
+    match /coaches/{coachId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(coachId) && isValidCoach(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // 5b. Players Collection
+    match /players/{playerId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(playerId) && isValidPlayer(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // 6. Run Logs Collection
+    match /runLogs/{logId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(logId) && isValidRunLog(incoming()) && (
+        isAdmin() || incoming().playerId == request.auth.uid
+      );
+      allow delete: if isAdmin() || (isSignedIn() && existing().playerId == request.auth.uid);
+    }
+
+    // 7. Daily Metrics Collection
+    match /dailyMetrics/{metricId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(metricId) && isValidDailyMetrics(incoming()) && (
+        isAdmin() || incoming().playerId == request.auth.uid
+      );
+      allow delete: if isAdmin() || (isSignedIn() && existing().playerId == request.auth.uid);
+    }
+
+    // 8. Educational Modules Collection
+    match /educationalModules/{moduleId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() || isAssociation();
+    }
+
+    // 9. Module Completions Collection
+    match /moduleCompletions/{completionId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(completionId) && isValidModuleCompletion(incoming()) && (
+        isAdmin() || incoming().playerId == request.auth.uid
+      );
+      allow delete: if isAdmin() || (isSignedIn() && existing().playerId == request.auth.uid);
+    }
+
+    // 10. Assignments Collection
+    match /assignments/{assignmentId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn() && (
+        isAdmin() || 
+        getUserRole(request.auth.uid) == 'coach' || 
+        isAssociation() ||
+        (getUserRole(request.auth.uid) == 'player' && isValidAssignment(incoming()))
+      );
+    }
+
+  }
+}

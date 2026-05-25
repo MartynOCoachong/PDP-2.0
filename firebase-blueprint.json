@@ -1,0 +1,234 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile across different roles: admin, association, club, team, coach, player",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "association", "club", "team", "coach", "player"] },
+        "associationId": { "type": "string" },
+        "clubId": { "type": "string" },
+        "teamId": { "type": "string" },
+        "coachId": { "type": "string" },
+        "manualCoachName": { "type": "string" },
+        "manualCoachEmail": { "type": "string" },
+        "approved": { "type": "boolean" }
+      },
+      "required": ["id", "name", "email", "role", "approved"]
+    },
+    "Association": {
+      "title": "Association",
+      "description": "Governing body organizing multiple clubs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "contactEmail": { "type": "string", "format": "email" },
+        "contactPhone": { "type": "string" },
+        "approved": { "type": "boolean" },
+        "UUID": { "type": "string" },
+        "association_name": { "type": "string" },
+        "association_email": { "type": "string", "format": "email" },
+        "create_at": { "type": "string" }
+      },
+      "required": ["id", "name", "contactEmail", "approved"]
+    },
+    "Club": {
+      "title": "Club",
+      "description": "Athletic club belonging to an association",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "associationId": { "type": "string" },
+        "contactEmail": { "type": "string", "format": "email" },
+        "approved": { "type": "boolean" },
+        "UUID": { "type": "string" },
+        "club": { "type": "string" },
+        "club_name": { "type": "string" },
+        "club_email": { "type": "string", "format": "email" },
+        "association_id": { "type": "string" },
+        "create_at": { "type": "string" }
+      },
+      "required": ["id", "name", "associationId", "contactEmail", "approved"]
+    },
+    "Team": {
+      "title": "Team",
+      "description": "Competitive team inside a club",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "clubId": { "type": "string" },
+        "contactEmail": { "type": "string", "format": "email" },
+        "approved": { "type": "boolean" }
+      },
+      "required": ["id", "name", "clubId", "contactEmail", "approved"]
+    },
+    "Coach": {
+      "title": "Coach",
+      "description": "Authorized head of coaching for a team",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "teamId": { "type": "string" },
+        "approved": { "type": "boolean" },
+        "UUID": { "type": "string" },
+        "coach": { "type": "string" },
+        "coach_email": { "type": "string", "format": "email" },
+        "team": { "type": "string" },
+        "create_at": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "teamId", "approved"]
+    },
+    "Player": {
+      "title": "Player",
+      "description": "Registered player details synchronized from user profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "coachId": { "type": "string" },
+        "approved": { "type": "boolean" },
+        "UUID": { "type": "string" },
+        "player_name": { "type": "string" },
+        "player_email": { "type": "string", "format": "email" },
+        "create_at": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "coachId", "approved"]
+    },
+    "RunLog": {
+      "title": "RunLog",
+      "description": "GPS run performance log created by player",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "playerId": { "type": "string" },
+        "date": { "type": "string" },
+        "durationSeconds": { "type": "number" },
+        "distanceKm": { "type": "number" },
+        "avgSpeedKmH": { "type": "number" },
+        "maxSpeedKmH": { "type": "number" },
+        "minSpeedKmH": { "type": "number" },
+        "gpsTrackPoints": { "type": "array" },
+        "fromAssignmentId": { "type": "string" }
+      },
+      "required": ["id", "playerId", "date", "durationSeconds", "distanceKm", "avgSpeedKmH", "gpsTrackPoints"]
+    },
+    "DailyMetrics": {
+      "title": "DailyMetrics",
+      "description": "Daily hydration, sleep and nutrition metrics log for players",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "playerId": { "type": "string" },
+        "hydrationMls": { "type": "number" },
+        "hydrationGoalMls": { "type": "number" },
+        "sleepHours": { "type": "number" },
+        "sleepQuality": { "type": "string", "enum": ["Poor", "Fair", "Good", "Excellent"] },
+        "nutritionCalories": { "type": "number" },
+        "nutritionProteinG": { "type": "number" },
+        "nutritionCarbsG": { "type": "number" },
+        "nutritionFatG": { "type": "number" }
+      },
+      "required": ["date", "playerId", "hydrationMls", "hydrationGoalMls", "sleepHours", "sleepQuality"]
+    },
+    "EducationalModule": {
+      "title": "EducationalModule",
+      "description": "Video/Markdown educational content built for coaches and admins",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["youtube", "document", "pdf", "quiz"] },
+        "category": { "type": "string" },
+        "content": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "quizQuestions": { "type": "array" }
+      },
+      "required": ["id", "title", "type", "category", "content", "durationMinutes"]
+    },
+    "ModuleCompletion": {
+      "title": "ModuleCompletion",
+      "description": "History of educational modules completed by player",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "playerId": { "type": "string" },
+        "moduleId": { "type": "string" },
+        "dateCompleted": { "type": "string" },
+        "quizScore": { "type": "object" }
+      },
+      "required": ["id", "playerId", "moduleId", "dateCompleted"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Homework or training assigned to teams",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "coachId": { "type": "string" },
+        "teamId": { "type": "string" },
+        "type": { "type": "string", "enum": ["run", "module"] },
+        "title": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "runDistanceKm": { "type": "number" },
+        "moduleId": { "type": "string" },
+        "completedByPlayerIds": { "type": "array" }
+      },
+      "required": ["id", "coachId", "teamId", "type", "title", "dueDate", "completedByPlayerIds"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "UserProfile",
+      "description": "Collection of user profile metadata records mapping uid to user configuration"
+    },
+    "associations": {
+      "schema": "Association",
+      "description": "National associations list"
+    },
+    "clubs": {
+      "schema": "Club",
+      "description": "Athletic clubs registered on the system"
+    },
+    "teams": {
+      "schema": "Team",
+      "description": "Competitive cohorts registered nested inside clubs"
+    },
+    "coaches": {
+      "schema": "Coach",
+      "description": "Registered coach credentials"
+    },
+    "players": {
+      "schema": "Player",
+      "description": "Registered players list"
+    },
+    "runLogs": {
+      "schema": "RunLog",
+      "description": "Completed player training logs list"
+    },
+    "dailyMetrics": {
+      "schema": "DailyMetrics",
+      "description": "Track record of daily nutrition, hydration and recovery metrics"
+    },
+    "educationalModules": {
+      "schema": "EducationalModule",
+      "description": "List of available visual/text educational elements"
+    },
+    "moduleCompletions": {
+      "schema": "ModuleCompletion",
+      "description": "Completed coursework logs for student/player statistics"
+    },
+    "assignments": {
+      "schema": "Assignment",
+      "description": "Homework and dynamic activities delegated by verified coaches"
+    }
+  }
+}

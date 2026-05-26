@@ -79,7 +79,7 @@ export default function App() {
   });
 
   // Load persistent configurations or defaults
-  const [activeTab, setActiveTab ] = useState<'dashboard' | 'classroom' | 'coaches' | 'admin' | 'linkage'>('dashboard');
+  const [activeTab, setActiveTab ] = useState<'dashboard' | 'classroom' | 'coaches' | 'admin'>('dashboard');
   
   // Cloud Sync Connection Configuration States
   const [useFirestore, setUseFirestore] = useState<boolean>(true);
@@ -1922,19 +1922,19 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
           
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 bg-gradient-to-tr from-emerald-500 to-indigo-600 rounded-xl flex items-center justify-center text-slate-900 font-bold font-mono tracking-tighter text-lg shadow-lg shadow-emerald-500/10">
-              EC
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold font-sans tracking-tight text-slate-100">
-                  ECHELON
-                </h1>
-                <span className="text-[10px] uppercase font-mono bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                  v2.4
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 font-mono">Player Development Portal</p>
+            <img 
+              src="https://i.ibb.co/SD3qJcNW/Untitled-design-4.png" 
+              alt="Echelon Logo" 
+              className="h-[60px] w-[60px] object-contain rounded-xl shadow-lg shadow-emerald-500/10"
+              referrerPolicy="no-referrer"
+            />
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold font-sans tracking-tight text-slate-100">
+                Player Development Portal
+              </h1>
+              <span className="text-[10px] uppercase font-mono bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                v2.4
+              </span>
             </div>
           </div>
 
@@ -1972,7 +1972,7 @@ export default function App() {
                     id="nav-classroom"
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-sans transition ${
                       activeTab === 'classroom'
-                        ? 'bg-slate-800 text-indigo-400 font-bold border border-slate-700'
+                        ? 'bg-slate-800 text-[#00bbff] font-bold border border-slate-700'
                         : 'text-slate-405 hover:bg-slate-855' // fallback matching hover and active structures
                     }`}
                   >
@@ -1998,18 +1998,6 @@ export default function App() {
                 )}
               </button>
             )}
-
-            <button
-              onClick={() => setActiveTab('linkage')}
-              id="nav-hierarchy"
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-sans transition ${
-                activeTab === 'linkage'
-                  ? 'bg-slate-800 text-indigo-400 font-bold border border-slate-700'
-                  : 'text-slate-405 hover:bg-slate-850'
-              }`}
-            >
-              Profile linking
-            </button>
 
             <button
               onClick={async () => {
@@ -2042,10 +2030,6 @@ export default function App() {
             <span>Logged profile: <b className="text-slate-200">{currentProfile.name}</b></span>
             <span className="text-slate-700">|</span>
             <span>Role: <b className="text-slate-200 upper">{currentProfile.role.toUpperCase()}</b></span>
-          </div>
-
-          <div className="text-slate-500 text-xs">
-            Echelon Sports Hierarchy: <b className="text-slate-400">Association ➔ Club ➔ Team ➔ Coach ➔ Player</b>
           </div>
         </div>
       </div>
@@ -2116,223 +2100,6 @@ export default function App() {
             onAddTeam={handleAddTeamDirect}
           />
         )}
-
-        {activeTab === 'linkage' && (
-          <>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-slate-100 font-sans">Corporate Org Taxon Hierarchy</h2>
-              <p className="text-xs text-slate-400 mt-1 max-w-xl">
-                Inspect how associations link down to clubs, teams, coaches, and players respectively. Approved entities form safe access-level bridges.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              
-              <div className="p-4 bg-slate-950 rounded-xl border border-slate-850 space-y-2">
-                <div className="text-[10px] font-mono text-indigo-400 uppercase font-semibold">1. Associations</div>
-                <div className="space-y-1 text-xs">
-                  {associations.filter(a => a.approved).map(a => (
-                    <div key={a.id} className="p-2 bg-slate-900 rounded border border-slate-800">
-                      <div className="font-sans font-semibold text-slate-205">{a.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">ID: {a.id}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-950 rounded-xl border border-slate-850 space-y-2">
-                <div className="text-[10px] font-mono text-emerald-400 uppercase font-semibold">2. Clubs</div>
-                <div className="space-y-1 text-xs">
-                  {clubs.filter(c => c.approved).map(c => (
-                    <div key={c.id} className="p-2 bg-slate-900 rounded border border-slate-800">
-                      <div className="font-sans font-semibold text-slate-205">{c.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">Assoc Ref: {c.associationId}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-950 rounded-xl border border-slate-850 space-y-2">
-                <div className="text-[10px] font-mono text-rose-450 uppercase font-semibold">3. Teams</div>
-                <div className="space-y-1 text-xs">
-                  {teams.filter(t => t.approved).map(t => (
-                    <div key={t.id} className="p-2 bg-slate-900 rounded border border-slate-800">
-                      <div className="font-sans font-semibold text-slate-205">{t.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">Club Ref: {t.clubId}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-950 rounded-xl border border-slate-850 space-y-2">
-                <div className="text-[10px] font-mono text-amber-400 uppercase font-semibold">4. Active Coaches</div>
-                <div className="space-y-1 text-xs">
-                  {coaches.filter(c => c.approved).map(c => (
-                    <div key={c.id} className="p-2 bg-slate-900 rounded border border-slate-800 font-sans font-medium text-slate-200">
-                      <div>{c.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">Team Ref: {c.teamId}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-950 rounded-xl border border-slate-850 space-y-2">
-                <div className="text-[10px] font-mono text-cyan-450 uppercase font-semibold">5. Active Players (Players Table)</div>
-                <div className="space-y-1 text-xs">
-                  {players.map(p => (
-                    <div key={p.id} className="p-2 bg-slate-900 rounded border border-slate-800 font-sans font-medium text-slate-200">
-                      <div className="truncate">{p.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">Coach Ref: {p.coachId || 'None'}</div>
-                    </div>
-                  ))}
-                  {players.length === 0 && (
-                    <div className="p-2 text-slate-500 text-[11px] italic font-sans">
-                      No synchronized Player table documents exist.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* System Control / Fresh Start Administrative Panel */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6 mt-6">
-            <div className="flex items-center gap-2.5">
-              <DatabaseZap className="w-5 h-5 text-indigo-400" />
-              <div>
-                <h2 className="text-lg font-bold text-slate-100 font-sans">System Environment Control Center</h2>
-                <p className="text-xs text-slate-400 mt-1 max-w-xl">
-                  Administrative utilities to clear cache pools, delete remote Cloud collections, or restore fallback fixtures safely.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-slate-850">
-              {/* Panel left: Start Fresh / Nuke zone */}
-              <div className="p-5 bg-slate-950/70 rounded-xl border border-rose-950/40 space-y-4">
-                <div className="space-y-1">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-rose-500 font-mono">DANGER ZONE (Nuke & Start Fresh)</h3>
-                  <p className="text-xs text-slate-400">
-                    Erased entities include: all associations, clubs, teams, coaches, daily logs, metric rows, requests, and user credentials.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-[11px] font-semibold text-slate-400 uppercase font-mono">
-                    Type <b className="text-rose-500 font-bold font-sans">WIPE</b> below to authorize system purge:
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full bg-slate-900 border border-slate-800 focus:border-rose-800 focus:ring-1 focus:ring-rose-800 rounded-lg px-3 py-2 text-xs font-mono text-rose-450 placeholder:text-slate-700 outline-none transition"
-                    placeholder="Type WIPE here"
-                    value={confirmWipeInput}
-                    onChange={(e) => setConfirmWipeInput(e.target.value)}
-                  />
-                </div>
-
-                <button
-                  onClick={handleCompleteSystemReset}
-                  disabled={confirmWipeInput !== 'WIPE' || resetting}
-                  className={`w-full py-2.5 px-4 rounded-lg text-xs font-bold font-mono transition flex items-center justify-center gap-2 ${
-                    confirmWipeInput === 'WIPE' && !resetting
-                      ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-950/20 active:translate-y-px duration-150'
-                      : 'bg-slate-900 text-slate-600 border border-slate-850 cursor-not-allowed'
-                  }`}
-                >
-                  {resetting ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-rose-300" />
-                      <span>Resetting structures...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CloudLightning className="w-4 h-4 text-rose-300 animate-pulse" />
-                      <span>WIPE LOCAL & DATABASE TABLES</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Operational indicators */}
-                {resetProgress && (
-                  <div className="p-3 bg-slate-900 rounded-lg border border-slate-850 animate-pulse">
-                    <div className="text-[10px] uppercase font-semibold text-indigo-400 font-mono">Operations Pipeline:</div>
-                    <div className="text-xs text-slate-300 mt-1 font-mono">{resetProgress}</div>
-                  </div>
-                )}
-
-                {resetError && (
-                  <div className="p-3 bg-rose-950/30 border border-rose-900/50 rounded-lg text-xs font-mono text-rose-400">
-                    <b>Purge aborted:</b> {resetError}
-                  </div>
-                )}
-
-                {resetSuccess && (
-                  <div className="p-3 bg-emerald-950/30 border border-emerald-900/50 rounded-lg text-xs text-emerald-400 font-sans">
-                    {resetSuccess}
-                  </div>
-                )}
-              </div>
-
-              {/* Panel right: Fixtures & Sync seeding */}
-              <div className="p-5 bg-slate-950/50 rounded-xl border border-slate-850 space-y-4 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Upload Fixtures Seeding</h3>
-                    <p className="text-xs text-slate-400">
-                      In case you want to upload standard template linkages (such as dummy associations or diagnostic modules/coaches) directly into your active Cloud Firestore database project.
-                    </p>
-                  </div>
-
-                  <div className="p-3 bg-slate-900/80 rounded border border-slate-850">
-                    <div className="text-[10px] text-slate-500 font-mono">CLOUD DIRECTORY TARGETS:</div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-1 select-all">
-                      /users, /associations, /clubs, /teams, /coaches, /assignments, /educationalModules
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <button
-                    onClick={handleSeedFirestoreData}
-                    disabled={seeding || !useFirestore}
-                    className={`w-full py-2.5 px-4 rounded-lg text-xs font-bold font-mono transition flex items-center justify-center gap-2 ${
-                      useFirestore && !seeding
-                        ? 'bg-indigo-650 hover:bg-indigo-600 text-white shadow-lg active:translate-y-px cursor-pointer'
-                        : 'bg-slate-900 text-slate-600 border border-slate-850 cursor-not-allowed'
-                    }`}
-                  >
-                    {seeding ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Seeding Firestore...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Database className="w-4 h-4 text-indigo-300" />
-                        <span>SEED INITIAL DEMO FIXTURES</span>
-                      </>
-                    )}
-                  </button>
-
-                  {syncStatusMsg && (
-                    <div className="p-2 bg-emerald-950/30 border border-emerald-900/50 rounded text-[11px] text-emerald-400 text-center">
-                      {syncStatusMsg}
-                    </div>
-                  )}
-
-                  {seedError && (
-                    <div className="p-2 bg-rose-950/30 border border-rose-900/50 rounded text-[11px] text-rose-455 text-center font-mono select-all">
-                      {seedError}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
 
       </main>
 

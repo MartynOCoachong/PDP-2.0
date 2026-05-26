@@ -4,8 +4,239 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Users, Award, Calendar, ChevronRight, Activity, Plus, Check, Clock, User, Sparkles, Filter, Database, Droplet, Star, ShieldAlert } from 'lucide-react';
+import { Users, Award, Calendar, ChevronRight, ChevronDown, Activity, Plus, Check, Clock, User, Sparkles, Filter, Database, Droplet, Star, ShieldAlert } from 'lucide-react';
 import { UserProfile, RunLog, DailyMetrics, Assignment, EducationalModule } from '../types';
+
+interface CoachesDashboardProps {
+  currentProfile: UserProfile;
+  players: UserProfile[];
+  runLogs: RunLog[];
+  metrics: Record<string, DailyMetrics[]>; // Raw calendar records keyed by playerId
+  assignments: Assignment[];
+  modules: EducationalModule[];
+  onAddAssignment: (assignment: Omit<Assignment, 'id' | 'completedByPlayerIds'>) => void;
+  onUpdatePlayerGoal?: (playerId: string, updatedGoals: Partial<DailyMetrics>) => void;
+}
+
+interface PlayerAccordionProps {
+  player: UserProfile;
+  isExpanded: boolean;
+  onToggle: () => void;
+  runLogs: RunLog[];
+  playerMetrics: DailyMetrics[];
+  onUpdatePlayerGoal?: (playerId: string, updatedGoals: Partial<DailyMetrics>) => void;
+  key?: string;
+}
+
+function PlayerPerformanceAccordion({
+  player,
+  isExpanded,
+  onToggle,
+  runLogs,
+  playerMetrics,
+  onUpdatePlayerGoal
+}: PlayerAccordionProps) {
+  const logs = runLogs.filter(r => r.playerId === player.id);
+  const totalDistance = logs.reduce((sum, r) => sum + r.distanceKm, 0);
+  const totalSeconds = logs.reduce((sum, r) => sum + r.durationSeconds, 0);
+  const avgSpeed = logs.length > 0 ? logs.reduce((sum, r) => sum + r.avgSpeedKmH, 0) / logs.length : 0;
+  const currentStats = {
+    count: logs.length,
+    distance: totalDistance,
+    duration: totalSeconds,
+    avgSpeed: avgSpeed
+  };
+
+  const latestMetric = playerMetrics.length > 0 ? playerMetrics[playerMetrics.length - 1] : null;
+
+  const [customHydration, setCustomHydration] = useState(latestMetric?.hydrationGoalMls || 3000);
+  const [customSleep, setCustomSleep] = useState(latestMetric?.sleepQuality || 'Good');
+  const [customRunGoal, setCustomRunGoal] = useState(latestMetric?.runDistanceGoalKm || 15.0);
+  const [goalFeedback, setGoalFeedback] = useState(false);
+
+  useEffect(() => {
+    if (latestMetric) {
+      setCustomHydration(latestMetric.hydrationGoalMls || 3000);
+      setCustomSleep(latestMetric.sleepQuality || 'Good');
+      setCustomRunGoal(latestMetric.runDistanceGoalKm || 15.0);
+    }
+  }, [latestMetric]);
+
+  const handleApplyPersonalGoals = () => {
+    if (!onUpdatePlayerGoal) return;
+    onUpdatePlayerGoal(player.id, {
+      hydrationGoalMls: customHydration,
+      sleepQuality: customSleep as 'Poor' | 'Fair' | 'Good' | 'Excellent',
+      runDistanceGoalKm: customRunGoal,
+    });
+    setGoalFeedback(true);
+    setTimeout(() => setGoalFeedback(false), 2500);
+  };
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden transition-all">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full text-left flex flex-col sm:flex-row justify-between sm:items-center gap-3 p-5 outline-none transition-colors hover:bg-slate-850/30"
+      >
+        <div className="flex items-center gap-3 select-none">
+          <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-400">
+            <User className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-sans font-bold text-slate-100">{player.name}</h2>
+              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded border border-slate-800 bg-slate-950/60 text-slate-400">
+                Performance Overview
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 font-mono mt-0.5">
+              Bound ID: {player.id} | Hierarchy Team: {player.teamId || 'Not Linked'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 select-none self-end sm:self-auto">
+          <span className="px-3 py-1 bg-emerald-500/15 border border-emerald-500/20 text-emerald-300 text-xs rounded-lg font-mono">
+            🔥 Active Streak: 5 Days
+          </span>
+          <div className={`p-1.5 rounded-lg bg-slate-950 border border-slate-850 text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+            <ChevronDown className="w-4 h-4" />
+          </div>
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="p-6 pt-2 border-t border-slate-850 space-y-6">
+          {/* Stats Widgets */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            
+            {/* Aerobic Load */}
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-850">
+              <div className="text-[10px] font-mono text-slate-400 uppercase">Weekly Aerobic Load</div>
+              <div className="text-2xl font-mono font-bold text-slate-100 mt-1">
+                {currentStats.distance.toFixed(2)}
+                <span className="text-xs text-slate-400 font-normal ml-1">km</span>
+              </div>
+              <div className="mt-2 text-[10px] font-mono text-slate-450 flex items-center justify-between">
+                <span>Target: {(latestMetric?.runDistanceGoalKm || 15.0).toFixed(1)}k</span>
+                <span className="text-emerald-400">
+                  {currentStats.distance ? Math.min(100, Math.floor((currentStats.distance / (latestMetric?.runDistanceGoalKm || 15.0)) * 105)) : 0}%
+                </span>
+              </div>
+              <div className="w-full bg-slate-850 h-1 rounded-full overflow-hidden mt-1.5">
+                <div 
+                  className="bg-emerald-400 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.min(100, (currentStats.distance / (latestMetric?.runDistanceGoalKm || 15.0)) * 100)}%` }} 
+                />
+              </div>
+            </div>
+
+            {/* Hydration Log Status */}
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-8-30">
+              <div className="text-[10px] font-mono text-slate-400 uppercase flex items-center gap-1">
+                <Droplet className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                Hydration Log Status
+              </div>
+              <div className="text-2xl font-mono font-bold text-slate-100 mt-1">
+                {latestMetric?.hydrationMls || 2100}
+                <span className="text-xs text-slate-400 font-normal ml-1">ml</span>
+              </div>
+              <div className="mt-2 text-[10px] font-mono text-slate-450 w-full flex items-center justify-between">
+                <span>Goal: {latestMetric?.hydrationGoalMls || 3000} ml</span>
+                <span className="text-sky-400">
+                  {Math.min(100, Math.floor(((latestMetric?.hydrationMls || 2100) / (latestMetric?.hydrationGoalMls || 3000)) * 100))}%
+                </span>
+              </div>
+              <div className="w-full bg-slate-850 h-1 rounded-full overflow-hidden mt-1.5">
+                <div 
+                  className="bg-sky-400 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.min(100, (((latestMetric?.hydrationMls || 2100) / (latestMetric?.hydrationGoalMls || 3000)) * 100))}%` }} 
+                />
+              </div>
+            </div>
+
+            {/* Sleep Quality Rating */}
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-850">
+              <div className="text-[10px] font-mono text-slate-400 uppercase">Sleep Quality Rating</div>
+              <div className="text-xl font-sans font-bold text-emerald-400 mt-1 flex items-center gap-1.5">
+                <Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
+                {latestMetric?.sleepQuality || 'Good'}
+              </div>
+              <p className="mt-2.5 text-[10px] font-mono text-slate-400">
+                Rest hours logged: <b className="text-slate-150">{latestMetric?.sleepHours || 8}h</b>
+              </p>
+            </div>
+          </div>
+
+          {/* Personalize Goals Panel */}
+          {onUpdatePlayerGoal && (
+            <div className="p-4 bg-slate-950 rounded-xl border border-slate-850/80 space-y-3.5">
+              <h3 className="text-xs font-bold font-mono text-slate-200 uppercase flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                Echelon Target Customizer
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] font-mono text-slate-450 mb-1">SET HYDRATION TARGET (ML)</label>
+                  <input
+                    type="number"
+                    step={250}
+                    value={customHydration}
+                    onChange={(e) => setCustomHydration(parseInt(e.target.value) || 3000)}
+                    className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded-lg p-2 font-mono outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-slate-450 mb-1">SET RUN DISTANCE GOAL (KM)</label>
+                  <input
+                    type="number"
+                    step={0.5}
+                    min={1}
+                    max={100}
+                    value={customRunGoal}
+                    onChange={(e) => setCustomRunGoal(parseFloat(e.target.value) || 15.0)}
+                    className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded-lg p-2 font-mono outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-slate-450 mb-1">REQUIRED MIN SLEEP RATING</label>
+                  <select
+                    value={customSleep}
+                    onChange={(e) => setCustomSleep(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded-lg p-2 font-mono outline-none"
+                  >
+                    <option value="Poor">Poor</option>
+                    <option value="Fair">Fair</option>
+                    <option value="Good">Good</option>
+                    <option value="Excellent">Excellent</option>
+                  </select>
+                </div>
+              </div>
+
+              {goalFeedback && (
+                <div className="text-xs font-semibold text-emerald-400 font-mono text-center pt-1">
+                  ✓ Goals updated and synced successfully inside the player dashboard!
+                </div>
+              )}
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={handleApplyPersonalGoals}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold px-4 py-2 rounded-lg transition"
+                >
+                  Update Player Personal Goals
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface CoachesDashboardProps {
   currentProfile: UserProfile;
@@ -32,6 +263,18 @@ export default function CoachesDashboard({
   const [selectedClubId, setSelectedClubId] = useState<string>('');
   const [selectedTeamId, setSelectedTeamId] = useState<string>(currentProfile.teamId || '');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
+
+  // Accordion open/close states
+  const [expandedPlayerIds, setExpandedPlayerIds] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (selectedPlayerId) {
+      setExpandedPlayerIds(prev => ({
+        ...prev,
+        [selectedPlayerId]: true
+      }));
+    }
+  }, [selectedPlayerId]);
   
   // Assignment dispatcher
   const [assignType, setAssignType] = useState<'run' | 'module'>('run');
@@ -153,55 +396,9 @@ export default function CoachesDashboard({
     <div className="space-y-6">
       {/* Header and Organizational Context */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 relative">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="p-1 px-2.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-medium flex items-center gap-1">
-                <Activity className="w-3 h-3 text-emerald-400" />
-                SECURITY CLEARANCE LEVEL: {currentProfile.role.toUpperCase()}
-              </span>
-              <span className="text-slate-500 font-mono text-xs">/</span>
-              <span className="text-xs text-slate-400 font-mono">Bound Context ID: {currentProfile.associationId || 'GLOBAL'}</span>
-            </div>
-            
-            <h1 className="text-2xl font-sans font-bold text-slate-100 mt-2.5">
-              Organization & Team Performance Hub
-            </h1>
-            <p className="text-xs text-slate-400 mt-1 max-w-xl">
-              Inspect tactical metrics, customize hydrating/nutritional thresholds, log practice sessions attendance, and deploy learning modules.
-            </p>
-          </div>
-
-          {/* Drilldown Dropdown Filter for Associations and Clubs */}
-          {(currentProfile.role === 'admin' || currentProfile.role === 'association' || currentProfile.role === 'club') && (
-            <div className="bg-slate-950 p-4 border border-slate-850/80 rounded-xl space-y-2 lg:w-80">
-              <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold flex items-center gap-1.5">
-                <Filter className="w-3 h-3 text-emerald-400" />
-                Sovereign Taxonomy Index
-              </span>
-              <div className="grid grid-cols-1 gap-2">
-                <div>
-                  <label className="block text-[10px] font-mono text-slate-500 mb-1">TEAM FILTER</label>
-                  <select
-                    value={selectedTeamId}
-                    onChange={(e) => {
-                      setSelectedTeamId(e.target.value);
-                      setSelectedPlayerId('');
-                    }}
-                    className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-200 rounded-lg p-2 outline-none font-sans"
-                  >
-                    <option value="">-- View All Hierarchy Teams --</option>
-                    <option value="team-1">Metro Stars U16 Elite (Club 1)</option>
-                    <option value="team-2">Metro Stars Girls U14 (Club 1)</option>
-                    <option value="team-3">Apex Varsity Squad (Club 2)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        <h1 className="text-2xl font-sans font-bold text-slate-100">
+          Organization & Team Performance Hub
+        </h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -260,185 +457,68 @@ export default function CoachesDashboard({
               })
             )}
           </div>
-
-          {/* Daily Attendance Card */}
-          {teamMatchesPlayers.length > 0 && (
-            <div className="bg-slate-950/80 border border-slate-850 p-4 rounded-xl space-y-3 mt-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-300 font-sans">Practice Session Log</span>
-                <input
-                  type="date"
-                  value={attendanceDate}
-                  onChange={(e) => setAttendanceDate(e.target.value)}
-                  className="bg-slate-900 text-[10px] text-slate-300 border border-slate-800 rounded px-1.5 py-0.5 font-mono"
-                />
-              </div>
-
-              <div className="space-y-1.5 pt-1.5 max-h-[160px] overflow-y-auto">
-                {teamMatchesPlayers.map((player) => (
-                  <div key={player.id} className="flex justify-between items-center text-xs">
-                    <span className="text-slate-350">{player.name}</span>
-                    <button
-                      onClick={() => handleToggleAttendance(player.id)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono transition ${
-                        attendanceState[player.id]
-                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-550'
-                          : 'bg-slate-850 text-slate-450 border border-transparent'
-                      }`}
-                    >
-                      {attendanceState[player.id] ? 'PRESENT' : 'MARKED ABSENT'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Right Side: Player Metric Insights & Assignment Control */}
-        {focusedPlayer ? (
+        {teamMatchesPlayers.length > 0 ? (
           <div className="lg:col-span-8 space-y-6">
             
-            {/* Player's Performance Metrics Cards */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-              
-              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-800 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-400">
-                    <User className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-sans font-bold text-slate-100">{focusedPlayer.name} Performance Overview</h2>
-                    <p className="text-xs text-slate-400 font-mono">Bound ID: {focusedPlayer.id} | Hierarchy Team: {focusedPlayer.teamId || 'Not Linked'}</p>
-                  </div>
-                </div>
-
-                <div className="px-3 py-1 bg-emerald-500/15 border border-emerald-500/20 text-emerald-300 text-xs rounded-lg font-mono">
-                  🔥 Active Streak: 5 Days
-                </div>
-              </div>
-
-              {/* Stats Widgets */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-850">
-                  <div className="text-[10px] font-mono text-slate-400 uppercase">Weekly Aerobic Load</div>
-                  <div className="text-2xl font-mono font-bold text-slate-100 mt-1">
-                    {currentFocusedStats?.distance.toFixed(2)}
-                    <span className="text-xs text-slate-400 font-normal ml-1">km</span>
-                  </div>
-                  <div className="mt-2 text-[10px] font-mono text-slate-450 flex items-center justify-between">
-                    <span>Target: {(latestMetric?.runDistanceGoalKm || 15.0).toFixed(1)}k</span>
-                    <span className="text-emerald-400">
-                      {currentFocusedStats ? Math.min(100, Math.floor((currentFocusedStats.distance / (latestMetric?.runDistanceGoalKm || 15.0)) * 100)) : 0}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-850 h-1 rounded-full overflow-hidden mt-1.5">
-                    <div 
-                      className="bg-emerald-400 h-full rounded-full" 
-                      style={{ width: `${Math.min(100, ((currentFocusedStats?.distance || 0) / (latestMetric?.runDistanceGoalKm || 15.0)) * 100)}%` }} 
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-850">
-                  <div className="text-[10px] font-mono text-slate-405 uppercase flex items-center gap-1">
-                    <Droplet className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                    Hydration Log Status
-                  </div>
-                  <div className="text-2xl font-mono font-bold text-slate-100 mt-1">
-                    {latestMetric?.hydrationMls || 2100}
-                    <span className="text-xs text-slate-400 font-normal ml-1">ml</span>
-                  </div>
-                  <div className="mt-2 text-[10px] font-mono text-slate-45 w-full flex items-center justify-between">
-                    <span>Goal: {latestMetric?.hydrationGoalMls || 3000} ml</span>
-                    <span className="text-sky-400">
-                      {Math.min(100, Math.floor(((latestMetric?.hydrationMls || 2100) / (latestMetric?.hydrationGoalMls || 3000)) * 100))}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-850 h-1 rounded-full overflow-hidden mt-1.5">
-                    <div 
-                      className="bg-sky-400 h-full rounded-full" 
-                      style={{ width: `${Math.min(100, (((latestMetric?.hydrationMls || 2100) / (latestMetric?.hydrationGoalMls || 3000)) * 100))}%` }} 
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-850">
-                  <div className="text-[10px] font-mono text-slate-405 uppercase">Sleep Quality Rating</div>
-                  <div className="text-xl font-sans font-bold text-emerald-450 mt-1 flex items-center gap-1.5">
-                    <Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
-                    {latestMetric?.sleepQuality || 'Good'}
-                  </div>
-                  <p className="mt-2.5 text-[10px] font-mono text-slate-400">
-                    Rest hours logged: <b className="text-slate-150">{latestMetric?.sleepHours || 8}h</b>
-                  </p>
-                </div>
-
-              </div>
-
-              {/* Personalize Goals Panel */}
-              {onUpdatePlayerGoal && (
-                <div className="p-4 bg-slate-950 rounded-xl border border-slate-850/80 space-y-3.5">
-                  <h3 className="text-xs font-bold font-mono text-slate-200 uppercase flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    Echelon Target Customizer
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-450 mb-1">SET HYDRATION TARGET (ML)</label>
-                      <input
-                        type="number"
-                        step={250}
-                        value={customHydration}
-                        onChange={(e) => setCustomHydration(parseInt(e.target.value) || 3000)}
-                        className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded-lg p-2 font-mono outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-450 mb-1">SET RUN DISTANCE GOAL (KM)</label>
-                      <input
-                        type="number"
-                        step={0.5}
-                        min={1}
-                        max={100}
-                        value={customRunGoal}
-                        onChange={(e) => setCustomRunGoal(parseFloat(e.target.value) || 15.0)}
-                        className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded-lg p-2 font-mono outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-450 mb-1">REQUIRED MIN SLEEP RATING</label>
-                      <select
-                        value={customSleep}
-                        onChange={(e) => setCustomSleep(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded-lg p-2 font-mono outline-none"
-                      >
-                        <option value="Poor">Poor</option>
-                        <option value="Fair">Fair</option>
-                        <option value="Good">Good</option>
-                        <option value="Excellent">Excellent</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {goalFeedback && (
-                    <div className="text-xs font-semibold text-emerald-400 font-mono text-center pt-1">
-                      ✓ Goals updated and synced successfully inside the player dashboard!
-                    </div>
-                  )}
-
-                  <div className="flex justify-end pt-1">
-                    <button
-                      onClick={handleApplyPersonalGoals}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold px-4 py-2 rounded-lg transition"
-                    >
-                      Update Player Personal Goals
-                    </button>
-                  </div>
-                </div>
-              )}
+            {/* Player's Performance Metrics Cards mapped in individual accordion style */}
+            <div className="space-y-4">
+              {teamMatchesPlayers.map((player) => (
+                <PlayerPerformanceAccordion
+                  key={player.id}
+                  player={player}
+                  isExpanded={!!expandedPlayerIds[player.id]}
+                  onToggle={() => {
+                    setExpandedPlayerIds(prev => ({
+                      ...prev,
+                      [player.id]: !prev[player.id]
+                    }));
+                  }}
+                  runLogs={runLogs}
+                  playerMetrics={metrics[player.id] || []}
+                  onUpdatePlayerGoal={onUpdatePlayerGoal}
+                />
+              ))}
             </div>
+
+            {/* Practice Session Log Card */}
+            {teamMatchesPlayers.length > 0 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-800/80 pb-3">
+                  <h2 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-400" />
+                    Practice Session Log
+                  </h2>
+                  <input
+                    type="date"
+                    value={attendanceDate}
+                    onChange={(e) => setAttendanceDate(e.target.value)}
+                    className="bg-slate-950 text-xs text-slate-300 border border-slate-800 rounded-lg px-2.5 py-1 font-mono outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
+                  {teamMatchesPlayers.map((player) => (
+                    <div key={player.id} className="flex justify-between items-center text-xs bg-slate-950/60 p-3.5 rounded-xl border border-slate-850">
+                      <span className="text-slate-300 font-medium">{player.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAttendance(player.id)}
+                        className={`px-3 py-1 rounded-lg text-[10px] font-mono transition font-semibold ${
+                          attendanceState[player.id]
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-slate-900 text-slate-450 border border-transparent hover:bg-slate-850'
+                        }`}
+                      >
+                        {attendanceState[player.id] ? 'PRESENT' : 'MARKED ABSENT'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Assignment Deployment Dispatcher */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">

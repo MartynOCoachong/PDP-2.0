@@ -1,1 +1,157 @@
 @import "tailwindcss";
+
+@theme {
+  --color-slate-950: #080808;
+  --color-slate-900: #1b1b1b;
+  --color-slate-850: #242424;
+  --color-slate-800: #2c2c2c;
+  --color-slate-700: #404040;
+  
+  --color-emerald-50: #e6f7ff;
+  --color-emerald-100: #bae3ff;
+  --color-emerald-200: #7cc9ff;
+  --color-emerald-300: #3daeff;
+  --color-emerald-400: #00bbff;
+  --color-emerald-500: #00bbff;
+  --color-emerald-600: #009be0;
+  --color-emerald-700: #007bb5;
+  --color-emerald-800: #005c8a;
+  --color-emerald-900: #003e5e;
+  --color-emerald-950: #001f30;
+}
+
+/* Base custom resets/style overrides to ensure absolute pristine contrast */
+html,
+body,
+#root,
+.bg-slate-950 {
+  background-color: #080808 !important;
+  color: #ffffff !important;
+}
+
+/* Widget Background: 1b1b1b */
+.bg-slate-900,
+.bg-slate-900\/50,
+.bg-slate-900\/20,
+.bg-slate-900\/80,
+main .bg-slate-900,
+main .bg-slate-950,
+main .bg-slate-950\/80,
+main .bg-slate-950\/60,
+main .bg-slate-950\/40,
+input select,
+select option,
+textarea,
+select {
+  background-color: #1b1b1b !important;
+}
+
+/* Keep main text color exactly white or light across all components */
+.text-slate-100,
+.text-slate-200,
+.text-slate-350,
+.text-slate-300 {
+  color: #ffffff !important;
+}
+.text-slate-400,
+.text-slate-450 {
+  color: #dbdbdb !important;
+}
+
+/* Change icon colours to - 00bbff */
+svg,
+.text-emerald-400,
+.text-emerald-450,
+.text-emerald-300 {
+  color: #00bbff !important;
+}
+
+/* Stroke colors for icons to ensure consistent presentation */
+svg path,
+svg circle,
+svg rect,
+svg line,
+svg polyline,
+svg polygon {
+  stroke: #00bbff !important;
+}
+
+/* Force specific icons when custom or hardcoded values are passed */
+svg.text-amber-400,
+svg.text-rose-500,
+svg.text-rose-400,
+svg.text-sky-400 {
+  color: #00bbff !important;
+}
+svg.text-amber-400 *,
+svg.text-rose-500 *,
+svg.text-rose-400 *,
+svg.text-sky-400 * {
+  stroke: #00bbff !important;
+}
+
+/* Change highlighted round corner boxes to a semi transparent - 1d75ff with a border of - 00bbff */
+.bg-emerald-500\/5,
+.bg-emerald-500\/10,
+.bg-emerald-500\/15,
+.bg-emerald-950\/30,
+.bg-emerald-500\/20,
+.bg-emerald-950\/50,
+.bg-emerald-950\/70,
+.p-2.5.bg-emerald-500\/10,
+.px-3.py-1.bg-emerald-500\/15,
+.bg-sky-400\/10,
+.bg-amber-500\/10,
+.bg-rose-950\/30,
+.bg-emerald-950\/30 {
+  background-color: rgba(29, 117, 255, 0.15) !important;
+  border: 1px solid #00bbff !important;
+  border-radius: 0.75rem !important; /* Rounded corners as requested */
+}
+
+/* Rounded buttons to - 00bbff */
+.bg-emerald-500,
+.bg-emerald-600,
+button[class*="bg-emerald-500"],
+button[class*="bg-emerald-600"],
+button.bg-emerald-500,
+button.bg-emerald-600,
+input[type="submit"] {
+  background-color: #00bbff !important;
+  color: #ffffff !important; /* Ensure main text is white and highly readable */
+  border-radius: 9999px !important; /* Perfect circle pill rounding */
+  border: none !important;
+  font-weight: 700 !important;
+}
+
+/* Ensure button icons style is white */
+button svg,
+button svg path,
+button svg circle,
+button svg rect,
+button svg line,
+button svg polyline,
+button svg polygon {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.bg-emerald-500:hover,
+.bg-emerald-600:hover,
+button[class*="bg-emerald-500"]:hover,
+button[class*="bg-emerald-600"]:hover {
+  background-color: #009be0 !important;
+}
+
+/* Force targeted font color to 00bbff */
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > span:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(1) {
+  color: #00bbff !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > button:nth-of-type(1) {
+  background-color: #00bbff !important;
+  color: #080808 !important;
+}
+
+

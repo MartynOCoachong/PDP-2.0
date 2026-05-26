@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { Play, Flame, Droplet, Coffee, Star, Trophy, CheckSquare, Calendar, ChevronRight, Moon, Utensils, Award, BookOpen, AlertCircle } from 'lucide-react';
 import { UserProfile, RunLog, DailyMetrics, Assignment, EducationalModule, ModuleCompletion } from '../types';
 import GPSRunTracker from './GPSRunTracker';
@@ -41,6 +42,7 @@ export default function PlayerDashboard({
   const [mealCarbs, setMealCarbs] = useState(70);
   const [mealFat, setMealFat] = useState(15);
   const [showMealLogger, setShowMealLogger] = useState(false);
+  const [hydrationScoop, setHydrationScoop] = useState<250 | 500 | 750>(250);
 
   // Active run log assignment target selectors
   const [trackAssignmentId, setTrackAssignmentId] = useState<string>('');
@@ -58,7 +60,7 @@ export default function PlayerDashboard({
 
   const handleIncrementHydration = () => {
     onUpdateDailyMetrics({
-      hydrationMls: metrics.hydrationMls + 250 // Add a glass (250ml)
+      hydrationMls: metrics.hydrationMls + hydrationScoop
     });
   };
 
@@ -190,51 +192,133 @@ export default function PlayerDashboard({
             </div>
 
             {/* Widget 2: Hydration intake goals */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl relative">
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1">
-                  <Droplet className="w-4 h-4 text-sky-400 shrink-0" />
-                  Hydration Level
-                </span>
-                <span className="text-xs font-mono font-bold text-sky-400">{hydrationPct}%</span>
-              </div>
-              <p className="text-[10px] text-slate-450 font-mono mb-4">Assigned by coach: {metrics.hydrationGoalMls} ml</p>
-
-              <div className="flex items-center gap-4">
-                <div className="flex-1 bg-slate-950 p-2.5 rounded-xl border border-slate-850 flex justify-between items-center">
-                  <div>
-                    <div className="text-[11px] font-mono text-slate-400">LOGGED VALUE</div>
-                    <div className="text-base font-bold font-mono text-slate-100">{metrics.hydrationMls} ml</div>
-                  </div>
-                  <button
-                    onClick={handleIncrementHydration}
-                    className="p-1 px-3 bg-sky-500 hover:bg-sky-600 active:scale-95 text-slate-950 font-bold text-xs rounded-lg transition"
-                    title="Logs a standard 250ml water scoop"
-                  >
-                    + 250ml
-                  </button>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl relative flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1">
+                    <Droplet className="w-4 h-4 text-sky-400 shrink-0" />
+                    Hydration Level
+                  </span>
+                  <span className="text-xs font-mono font-bold text-sky-400">{hydrationPct}%</span>
                 </div>
+                <p className="text-[10px] text-slate-450 font-mono mb-4">Assigned by coach: {metrics.hydrationGoalMls} ml</p>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 text-xs mb-4">
+                  <div className="text-[10px] font-mono text-slate-400 uppercase mb-1">LOGGED VALUE</div>
+                  <div className="text-lg font-bold font-mono text-slate-100">{metrics.hydrationMls} ml</div>
+                </div>
+              </div>
+
+              {/* Slider for scoop selection */}
+              <div className="space-y-3">
+                <div>
+                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wide mb-1.5">Selected Scoop Size:</div>
+                  <div className="grid grid-cols-3 bg-slate-950 p-1 rounded-xl border border-slate-850 gap-1 relative overflow-hidden" style={{ minHeight: '36px' }}>
+                    {([250, 500, 750] as const).map((size) => {
+                      const isSelected = hydrationScoop === size;
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => setHydrationScoop(size)}
+                          className={`relative z-10 py-1.5 text-center text-[10px] font-sans font-bold transition-all uppercase rounded-lg ${
+                            isSelected ? 'text-slate-950' : 'text-slate-450 hover:text-slate-200'
+                          }`}
+                          style={{ outline: 'none' }}
+                        >
+                          {isSelected && (
+                            <motion.div
+                              layoutId="activeHydrationScoopIndicator"
+                              className="absolute inset-0 bg-[#00bbff] rounded-lg -z-10"
+                              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                            />
+                          )}
+                          {size} ml
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleIncrementHydration}
+                  className="w-full py-2 bg-[#00bbff] hover:bg-[#009be0] active:scale-95 text-slate-950 font-sans font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
+                >
+                  <Droplet className="w-3.5 h-3.5 text-slate-950" />
+                  + Log {hydrationScoop}ml Intake
+                </button>
               </div>
             </div>
 
             {/* Widget 3: Sleep quality tracker */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl relative">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-350 uppercase mb-4">
-                <Moon className="w-4 h-4 text-amber-300 shrink-0" />
-                Sleep Optimization Rating
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl relative flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-350 uppercase mb-4">
+                  <Moon className="w-4 h-4 text-emerald-400 shrink-0" />
+                  Sleep Optimization Rating
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 bg-slate-950 p-3 rounded-xl border border-slate-850 text-xs mb-4">
+                  <div>
+                    <div className="text-[10px] font-mono text-slate-450 uppercase mb-1">Sleep Hours</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onUpdateDailyMetrics({ sleepHours: Math.max(0, metrics.sleepHours - 0.5) })}
+                        className="w-6 h-6 rounded-full bg-[#00bbff] hover:bg-[#009be0] text-slate-950 font-bold flex items-center justify-center transition-transform active:scale-90"
+                        title="Decrease sleep hours"
+                      >
+                        -
+                      </button>
+                      <span className="font-mono font-bold text-slate-100 text-sm">{metrics.sleepHours}h</span>
+                      <button
+                        type="button"
+                        onClick={() => onUpdateDailyMetrics({ sleepHours: Math.min(24, metrics.sleepHours + 0.5) })}
+                        className="w-6 h-6 rounded-full bg-[#00bbff] hover:bg-[#009be0] text-slate-950 font-bold flex items-center justify-center transition-transform active:scale-90"
+                        title="Increase sleep hours"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-mono text-slate-455 uppercase mb-1">Rating</div>
+                    <div className="text-sm font-sans font-bold text-emerald-400 flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 fill-emerald-400 border-none shrink-0" />
+                      <span className="text-xs uppercase tracking-wider">{metrics.sleepQuality}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 bg-slate-950 p-3 rounded-xl border border-slate-850 text-xs">
-                <div>
-                  <div className="text-[10px] font-mono text-slate-450 uppercase">Sleep Hours</div>
-                  <div className="text-base font-mono font-bold text-slate-200 mt-0.5">{metrics.sleepHours} hrs</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-mono text-slate-455 uppercase">Rating</div>
-                  <div className="text-base font-sans font-bold text-amber-300 mt-0.5 flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-amber-300 border-none" />
-                    {metrics.sleepQuality}
-                  </div>
+              {/* Slider Toggles for rating */}
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wide">Adjust Quality Rating Slider:</div>
+                <div className="grid grid-cols-4 bg-slate-950 p-1 rounded-xl border border-slate-850 gap-1 relative overflow-hidden" style={{ minHeight: '36px' }}>
+                  {(['Poor', 'Fair', 'Good', 'Excellent'] as const).map((opt) => {
+                    const isSelected = metrics.sleepQuality === opt;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => onUpdateDailyMetrics({ sleepQuality: opt })}
+                        className={`relative z-10 py-1.5 text-center text-[10px] font-sans font-bold transition-all uppercase rounded-lg ${
+                          isSelected ? 'text-slate-950' : 'text-slate-450 hover:text-slate-200'
+                        }`}
+                        style={{ outline: 'none' }}
+                      >
+                        {isSelected && (
+                          <motion.div
+                            layoutId="activeSleepQualityIndicator"
+                            className="absolute inset-0 bg-[#00bbff] rounded-lg -z-10"
+                            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                          />
+                        )}
+                        {opt}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -269,8 +353,9 @@ export default function PlayerDashboard({
 
                 {!showMealLogger ? (
                   <button
+                    type="button"
                     onClick={() => setShowMealLogger(true)}
-                    className="w-full py-1.5 bg-slate-950 hover:bg-slate-850 text-slate-300 text-xs font-semibold rounded-lg border border-slate-800 transition"
+                    className="w-full py-2 bg-[#00bbff] hover:bg-[#009be0] text-slate-950 text-xs font-bold rounded-xl transition active:scale-95"
                   >
                     Log Active Meal Calories
                   </button>
@@ -300,13 +385,13 @@ export default function PlayerDashboard({
                       <button
                         type="button"
                         onClick={() => setShowMealLogger(false)}
-                        className="text-[10px] text-slate-450"
+                        className="text-[10px] text-slate-400 hover:text-slate-100 transition-colors"
                       >
                         Dismiss
                       </button>
                       <button
                         type="submit"
-                        className="bg-emerald-500 text-slate-950 text-[10px] font-bold px-3 py-1 rounded"
+                        className="bg-[#00bbff] hover:bg-[#009be0] text-slate-950 text-[10px] font-bold px-3.5 py-1.5 rounded-lg active:scale-95 transition"
                       >
                         Apply Intake Log
                       </button>
@@ -366,14 +451,14 @@ export default function PlayerDashboard({
           
           {/* Completed Modules Widget Track */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl relative">
-            <span className="text-[10px] font-mono text-indigo-450 tracking-wide font-bold block mb-1">
+            <span className="text-[10px] font-mono text-[#00bbff] tracking-wide font-bold block mb-1">
               EDUCATIONAL STATS
             </span>
             <h3 className="text-sm font-semibold text-slate-200">Academy Modules Verified</h3>
             
             <div className="mt-4 flex items-center justify-between">
               <div>
-                <div className="text-2xl font-mono font-bold text-indigo-400">
+                <div className="text-2xl font-mono font-bold text-[#00bbff]">
                   {completedModulesCount} / {totalPossibleModules}
                 </div>
                 <div className="text-[11px] text-slate-450 mt-0.5 leading-relaxed">Completed & Tested</div>
@@ -381,7 +466,7 @@ export default function PlayerDashboard({
               
               <button
                 onClick={() => onSelectTab('classroom')}
-                className="p-2 rounded-xl bg-slate-950 hover:bg-slate-850 text-indigo-400 border border-slate-850 flex items-center gap-1.5 transition text-xs font-semibold"
+                className="p-2 rounded-xl bg-slate-950 hover:bg-slate-850 text-[#00bbff] border border-slate-850 flex items-center gap-1.5 transition text-xs font-semibold hover:opacity-90"
               >
                 Go to Classroom
                 <ChevronRight className="w-4 h-4" />

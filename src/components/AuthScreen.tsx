@@ -220,7 +220,7 @@ export default function AuthScreen({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <img 
-              src="https://i.ibb.co/SD3qJcNW/Untitled-design-4.png" 
+              src="https://i.ibb.co/GfHgRPwT/Untitled-design-5.png" 
               alt="Echelon Logo" 
               className="h-10 w-10 object-contain rounded-xl"
               referrerPolicy="no-referrer"

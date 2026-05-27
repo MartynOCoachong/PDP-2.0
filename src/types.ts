@@ -166,6 +166,7 @@ export interface Assignment {
   // For 'module'
   moduleId?: string;
   completedByPlayerIds: string[]; // List of players who have finished this
+  playerId?: string; // Optional: for player-only self-scheduled or assigned tasks
 }
 
 export interface OrgProfileRequest {

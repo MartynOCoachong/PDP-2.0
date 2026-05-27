@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Play, Flame, Droplet, Coffee, Star, Trophy, CheckSquare, Calendar, ChevronRight, Moon, Utensils, Award, BookOpen, AlertCircle } from 'lucide-react';
 import { UserProfile, RunLog, DailyMetrics, Assignment, EducationalModule, ModuleCompletion } from '../types';
@@ -19,6 +19,10 @@ interface PlayerDashboardProps {
   onSaveRun: (newRun: Omit<RunLog, 'id' | 'playerId' | 'date'>) => void;
   onUpdateDailyMetrics: (metrics: Partial<DailyMetrics>) => void;
   onSelectTab: (tab: 'classroom') => void;
+  allPlayers?: UserProfile[];
+  allRunLogs?: RunLog[];
+  allMetrics?: Record<string, DailyMetrics[]>;
+  allCompletions?: ModuleCompletion[];
 }
 
 export default function PlayerDashboard({
@@ -30,7 +34,11 @@ export default function PlayerDashboard({
   completions,
   onSaveRun,
   onUpdateDailyMetrics,
-  onSelectTab
+  onSelectTab,
+  allPlayers = [],
+  allRunLogs = [],
+  allMetrics = {},
+  allCompletions = []
 }: PlayerDashboardProps) {
   // Calendar date view
   const [activeCalendarDate, setActiveCalendarDate] = useState('2026-05-21');
@@ -55,8 +63,123 @@ export default function PlayerDashboard({
   const hydrationPct = Math.min(100, Math.round((metrics.hydrationMls / metrics.hydrationGoalMls) * 100));
   const caloriePct = Math.min(100, Math.round((metrics.nutritionCalories / 2800) * 100)); // Daily average cap target 2800 kcal
 
-  const totalPossibleModules = modules.length;
-  const completedModulesCount = completions.length;
+  // Educational stats linked to assigned classroom education sessions
+  const assignedModules = assignments.filter(a => a.type === 'module');
+  const assignedModulesCount = assignedModules.length;
+  const completedAssignedModulesCount = assignedModules.filter(a => {
+    return a.completedByPlayerIds.includes(playerProfile.id) || completions.some(comp => comp.moduleId === a.moduleId);
+  }).length;
+
+  // Composite Team / Squad Ranking Engine
+  const overallRankingInfo = useMemo(() => {
+    // We look for players assigned to the same coach first to calculate team ranking.
+    // If not enough peers, fall back to global players for broad competitiveness.
+    let list = (allPlayers || []).filter(p => p.role === 'player' && p.coachId === playerProfile.coachId);
+    if (list.length <= 1) {
+      list = (allPlayers || []).filter(p => p.role === 'player');
+    }
+
+    if (list.length === 0) {
+      return { rank: 1, totalPlayers: 1, title: 'Squad Leader' };
+    }
+
+    // Previous 7 days rolling window (same as leaderboard) aligned with current dates
+    const today = new Date('2026-05-26'); 
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - 7);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const isDateInWeek = (dateStr: string) => {
+      if (!dateStr) return false;
+      const cleanDate = new Date(dateStr.substring(0, 10));
+      return cleanDate >= startOfWeek;
+    };
+
+    // Calculate performance indicators for each athlete
+    const playerSummaries = list.map(player => {
+      const pId = player.id;
+      
+      // A. Running distance total
+      const pRuns = (allRunLogs || []).filter(log => log.playerId === pId && isDateInWeek(log.date));
+      const distance = pRuns.reduce((sum, run) => sum + run.distanceKm, 0);
+
+      // B. Best 3K pace
+      const eligible3k = pRuns.filter(r => r.distanceKm >= 3.0);
+      let best3kPace = Infinity;
+      eligible3k.forEach(run => {
+        const pace = run.durationSeconds / run.distanceKm;
+        if (pace < best3kPace) best3kPace = pace;
+      });
+
+      // C. Hydration cumulative mls
+      const pMetrics = (allMetrics && allMetrics[pId] || []).filter(met => isDateInWeek(met.date));
+      const hydrationTotal = pMetrics.reduce((sum, met) => sum + met.hydrationMls, 0);
+
+      // D. Sleep cumulative hours
+      const sleepTotal = pMetrics.reduce((sum, met) => sum + met.sleepHours, 0);
+
+      // E. Educational Classroom Module completion count
+      const pCompletions = (allCompletions || []).filter(comp => comp.playerId === pId && isDateInWeek(comp.dateCompleted));
+      const completionsCount = pCompletions.length;
+
+      return {
+        id: pId,
+        distance,
+        best3kPace,
+        hydrationTotal,
+        sleepTotal,
+        completionsCount
+      };
+    });
+
+    // Rank helper generator
+    const getAttrRank = (pId: string, attr: keyof typeof playerSummaries[0], ascending = false) => {
+      const sorted = [...playerSummaries].sort((a, b) => {
+        const valA = a[attr] as number;
+        const valB = b[attr] as number;
+        if (valA === valB) return 0;
+        if (ascending) {
+          return valA - valB;
+        } else {
+          return valB - valA;
+        }
+      });
+      return sorted.findIndex(s => s.id === pId) + 1;
+    };
+
+    // Score all peer athletes dynamically
+    const compositeScores = list.map(player => {
+      const pId = player.id;
+      const rankDist = getAttrRank(pId, 'distance', false);
+      const rankPace = getAttrRank(pId, 'best3kPace', true); // lower is better
+      const rankWater = getAttrRank(pId, 'hydrationTotal', false);
+      const rankSleep = getAttrRank(pId, 'sleepTotal', false);
+      const rankClass = getAttrRank(pId, 'completionsCount', false);
+
+      const rankSum = rankDist + rankPace + rankWater + rankSleep + rankClass;
+      return {
+        id: pId,
+        rankSum
+      };
+    });
+
+    const sortedComposite = [...compositeScores].sort((a, b) => a.rankSum - b.rankSum);
+    const myIndex = sortedComposite.findIndex(s => s.id === playerProfile.id);
+    const myRank = myIndex !== -1 ? myIndex + 1 : list.length;
+
+    let title = 'Active Competitor';
+    if (myRank === 1) title = 'Squad Leader';
+    else if (myRank === 2) title = 'Elite Captain';
+    else if (myRank === 3) title = 'Pace Setter';
+    else if (myRank === 4) title = 'Elite Contender';
+    else if (myRank === 5) title = 'Rising Star';
+
+    return {
+      rank: myRank,
+      totalPlayers: list.length,
+      title
+    };
+  }, [allPlayers, allRunLogs, allMetrics, allCompletions, playerProfile.id, playerProfile.coachId]);
 
   const handleIncrementHydration = () => {
     onUpdateDailyMetrics({
@@ -123,8 +246,7 @@ export default function PlayerDashboard({
                 Welcome, {playerProfile.name}
               </h2>
               <p className="text-xs text-slate-400 mt-1">
-                Your profile is synchronized with Coach <b className="text-slate-300">{playerProfile.manualCoachName || 'Martyn ODonnell'}</b>. 
-                Keep logging workouts to optimize your biometric rankings.
+                Your profile is synced with Coach <b className="text-slate-300">{playerProfile.manualCoachName || 'Martyn ODonnell'}</b>. 
               </p>
             </div>
             
@@ -132,7 +254,9 @@ export default function PlayerDashboard({
               <Trophy className="w-5 h-5 text-amber-400" />
               <div>
                 <div className="text-[10px] font-mono text-slate-450 uppercase">Weekly Rank</div>
-                <div className="text-xs font-sans font-bold text-slate-200">#3 Squad Leader</div>
+                <div className="text-xs font-sans font-bold text-slate-200">
+                  #{overallRankingInfo.rank} {overallRankingInfo.title}
+                </div>
               </div>
             </div>
           </div>
@@ -459,9 +583,9 @@ export default function PlayerDashboard({
             <div className="mt-4 flex items-center justify-between">
               <div>
                 <div className="text-2xl font-mono font-bold text-[#00bbff]">
-                  {completedModulesCount} / {totalPossibleModules}
+                  {completedAssignedModulesCount} / {assignedModulesCount}
                 </div>
-                <div className="text-[11px] text-slate-450 mt-0.5 leading-relaxed">Completed & Tested</div>
+                <div className="text-[11px] text-slate-450 mt-0.5 leading-relaxed">Assigned Modules Logged</div>
               </div>
               
               <button
@@ -473,19 +597,41 @@ export default function PlayerDashboard({
               </button>
             </div>
 
-            {/* Micro completed listing */}
+            {/* Micro completed listing to reflect all assigned modules and their exact state */}
             <div className="mt-4 space-y-1.5">
-              {completions.map((comp) => {
-                const mod = modules.find(m => m.id === comp.moduleId);
-                return (
-                  <div key={comp.id} className="p-2 bg-slate-950 rounded border border-slate-855 text-[10px] font-mono text-slate-400 flex justify-between items-center">
-                    <span className="truncate max-w-[150px] text-slate-300 font-semibold">{mod?.title}</span>
-                    <span>
-                      {comp.quizScore ? `Score: ${comp.quizScore.score}/${comp.quizScore.total}` : 'READ'}
-                    </span>
-                  </div>
-                );
-              })}
+              {assignedModules.length === 0 ? (
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-850 text-center text-[10px] font-mono text-slate-500">
+                  No classroom sessions assigned by coach.
+                </div>
+              ) : (
+                assignedModules.map((assign) => {
+                  const mod = modules.find(m => m.id === assign.moduleId);
+                  const completionRecord = completions.find(comp => comp.moduleId === assign.moduleId);
+                  const isCompleted = assign.completedByPlayerIds.includes(playerProfile.id) || !!completionRecord;
+                  
+                  return (
+                    <div key={assign.id} className="p-2.5 bg-slate-950 rounded-xl border border-slate-850 text-[10px] font-mono flex justify-between items-center">
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <span className="truncate max-w-[150px] text-slate-300 font-semibold">{mod?.title || assign.title || 'Learning Module'}</span>
+                        <span className="text-[8px] text-slate-500">Due: {assign.dueDate}</span>
+                      </div>
+                      <div>
+                        {isCompleted ? (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase text-[8px]">
+                            {completionRecord?.quizScore 
+                              ? `Score: ${completionRecord.quizScore.score}/${completionRecord.quizScore.total}` 
+                              : 'DONE'}
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold uppercase text-[8px]">
+                            REQUIRED
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 

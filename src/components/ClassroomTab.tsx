@@ -3,24 +3,42 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { BookOpen, Video, Award, CheckCircle, ArrowRight, HelpCircle, GraduationCap } from 'lucide-react';
-import { EducationalModule, ModuleCompletion } from '../types';
+import React, { useState, useRef, useEffect } from 'react';
+import { BookOpen, Video, Award, CheckCircle, ArrowRight, HelpCircle, GraduationCap, Calendar, Send } from 'lucide-react';
+import { EducationalModule, ModuleCompletion, UserProfile, Assignment } from '../types';
 
 interface ClassroomTabProps {
   modules: EducationalModule[];
   completions: ModuleCompletion[];
   onCompleteModule: (moduleId: string, quizScore?: { score: number; total: number }) => void;
+  currentProfile?: UserProfile;
+  onAddAssignment?: (assignment: Omit<Assignment, 'id' | 'completedByPlayerIds'>) => void;
+  assignments?: Assignment[];
 }
 
-export default function ClassroomTab({ modules, completions, onCompleteModule }: ClassroomTabProps) {
+export default function ClassroomTab({ modules, completions, onCompleteModule, currentProfile, onAddAssignment, assignments }: ClassroomTabProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [activeModule, setActiveModule] = useState<EducationalModule | null>(null);
+  
+  // Ref for smooth scrolling to content viewer
+  const detailsRef = useRef<HTMLDivElement>(null);
   
   // Quiz state
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState<{ score: number; total: number } | null>(null);
+
+  // Coach / Player Assignment State
+  const [dueDate, setDueDate] = useState('2026-05-26');
+  const [customTitle, setCustomTitle] = useState('');
+  const [assignSuccess, setAssignSuccess] = useState(false);
+
+  // Smoothly scroll active module panel into view on mobile/desktop selection
+  useEffect(() => {
+    if (activeModule && detailsRef.current) {
+      detailsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [activeModule?.id]);
 
   const categories = ['All', 'Nutrition & Cooking', 'Strength & Conditioning', 'Mental Health', 'Stretching & Yoga', 'Injury Prevention'];
 
@@ -36,11 +54,24 @@ export default function ClassroomTab({ modules, completions, onCompleteModule }:
     return completions.find(c => c.moduleId === moduleId);
   };
 
+  const isAssigned = (moduleId: string) => {
+    if (currentProfile?.role !== 'player') return false;
+    return assignments?.some(a => a.type === 'module' && a.moduleId === moduleId) || false;
+  };
+
+  const getAssignmentInfo = (moduleId: string) => {
+    return assignments?.find(a => a.type === 'module' && a.moduleId === moduleId);
+  };
+
+  const pendingRequiredList = modules.filter(m => isAssigned(m.id) && !isCompleted(m.id));
+
   const handleSelectModule = (mod: EducationalModule) => {
     setActiveModule(mod);
     setQuizAnswers({});
     setQuizSubmitted(false);
     setQuizScore(null);
+    setCustomTitle(`Required Session: ${mod.title}`);
+    setAssignSuccess(false);
   };
 
   const selectQuizAnswer = (qId: string, optionIndex: number) => {
@@ -83,37 +114,54 @@ export default function ClassroomTab({ modules, completions, onCompleteModule }:
             LEARNING ACADEMY
           </span>
           <h1 className="text-2xl font-sans font-bold text-slate-100 mt-2">Classroom Sessions</h1>
-          <p className="text-xs text-slate-400 mt-1 max-w-xl">
-            Acquire elite insights into performance health, stretching techniques, injury avoidance, nutrition meal builds, and emotional endurance vectors.
-          </p>
         </div>
 
         {/* Categories Pills */}
         <div className="flex flex-wrap gap-2 mt-6">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => {
-                setSelectedCategory(cat);
-                if (activeModule && activeModule.category !== cat && cat !== 'All') {
-                  setActiveModule(null);
-                }
-              }}
-              className={`px-4 py-2 rounded-xl text-xs font-medium font-sans border transition ${
-                selectedCategory === cat
-                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/10'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-800'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+          {categories.map((cat, idx) => {
+            const isSelected = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  if (activeModule && activeModule.category !== cat && cat !== 'All') {
+                    setActiveModule(null);
+                  }
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-medium font-sans border transition ${
+                  isSelected
+                    ? `bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/10 active-tab`
+                    : 'bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-800'
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
         </div>
       </div>
 
+      {pendingRequiredList.length > 0 && (
+        <div className="bg-[#00bbff]/5 border border-[#00bbff]/30 p-4 rounded-2xl flex items-start gap-3 relative overflow-hidden animate-pulse shadow-[0_0_15px_rgba(0,187,255,0.15)]">
+          <div className="p-2 rounded-lg bg-[#00bbff]/10 text-[#00bbff]">
+            <Award className="w-5 h-5 shrink-0" />
+          </div>
+          <div>
+            <h4 className="text-sm font-sans font-bold text-slate-100 flex items-center gap-1.5">
+              <span>Required Training Session Pending</span>
+              <span className="h-2 w-2 rounded-full bg-[#00bbff] inline-block" />
+            </h4>
+            <p className="text-xs text-slate-400 mt-1">
+              Your coach has assigned <span className="text-[#00bbff] font-bold">"{pendingRequiredList[0].title}"</span> as a mandatory session. Please select and complete the module below to update your Academy performance metrics.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Module List panel */}
-        <div className={`space-y-3 ${activeModule ? 'lg:col-span-4' : 'lg:col-span-12'}`}>
+        <div id="classroom-modules-list" className={`space-y-3 ${activeModule ? 'lg:col-span-4' : 'lg:col-span-12'}`}>
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-mono text-slate-400">Available Modules ({filteredModules.length})</span>
           </div>
@@ -121,18 +169,24 @@ export default function ClassroomTab({ modules, completions, onCompleteModule }:
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-3">
             {filteredModules.map((mod) => {
               const comp = getCompletionDetails(mod.id);
+              const assigned = isAssigned(mod.id);
+              const isComp = !!comp;
               return (
                 <div
                   key={mod.id}
                   onClick={() => handleSelectModule(mod)}
                   className={`p-4 rounded-xl border transition cursor-pointer text-left relative flex flex-col justify-between ${
                     activeModule?.id === mod.id
-                      ? 'bg-indigo-500/10 border-indigo-500 shadow-indigo-500/5'
-                      : 'bg-slate-900 hover:bg-slate-850 border-slate-800'
+                      ? assigned && !isComp
+                        ? 'bg-indigo-500/15 border-[#00bbff] shadow-[0_0_15px_rgba(0,187,255,0.35)] font-bold'
+                        : 'bg-indigo-500/10 border-indigo-500 shadow-indigo-500/5'
+                      : assigned && !isComp
+                        ? 'bg-slate-900 border-[#00bbff] shadow-[0_0_12px_rgba(0,187,255,0.25)] hover:shadow-[0_0_18px_rgba(0,187,255,0.4)] hover:border-[#00bbff] animate-[pulse_3s_infinite]'
+                        : 'bg-slate-900 hover:bg-slate-850 border-slate-800'
                   }`}
                 >
                   <div>
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2 flex-wrap sm:flex-nowrap">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
                         mod.category === 'Nutrition & Cooking' ? 'bg-amber-500/10 text-amber-400' :
                         mod.category === 'Strength & Conditioning' ? 'bg-rose-500/10 text-rose-400' :
@@ -142,12 +196,20 @@ export default function ClassroomTab({ modules, completions, onCompleteModule }:
                       }`}>
                         {mod.category}
                       </span>
-                      {comp && (
+                      {assigned && !isComp ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-[#00bbff]/10 text-[#00bbff] border border-[#00bbff]/30 animate-pulse uppercase">
+                          Required
+                        </span>
+                      ) : assigned && isComp ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-750 uppercase">
+                          Required (Done)
+                        </span>
+                      ) : isComp ? (
                         <span className="text-emerald-400 flex items-center gap-1 text-[11px] font-medium">
                           <CheckCircle className="w-3.5 h-3.5" />
                           Done
                         </span>
-                      )}
+                      ) : null}
                     </div>
 
                     <h3 className="font-sans font-semibold text-slate-200 mt-2.5 text-sm line-clamp-2">
@@ -170,7 +232,7 @@ export default function ClassroomTab({ modules, completions, onCompleteModule }:
 
         {/* Main session content viewer */}
         {activeModule ? (
-          <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div ref={detailsRef} id="classroom-module-details" className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6 scroll-mt-24 transition-all duration-300">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-5">
               <div>
                 <span className="text-xs text-indigo-400 font-mono font-bold tracking-wider">{activeModule.category}</span>
@@ -183,6 +245,72 @@ export default function ClassroomTab({ modules, completions, onCompleteModule }:
                 Close View
               </button>
             </div>
+
+            {currentProfile?.role === 'coach' && (
+              <div className="bg-indigo-950/20 border border-indigo-500/20 p-5 rounded-xl space-y-4 relative overflow-hidden">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+                    <Send className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-sans font-bold text-slate-100">Coach Dispatch Controls</h3>
+                    <p className="text-[11px] text-slate-400">Select options below to dispatch this learning session as a required module in players' dashboard.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-400 mb-1.5 uppercase">Assignment Roster Title</label>
+                    <input
+                      type="text"
+                      value={customTitle}
+                      onChange={(e) => setCustomTitle(e.target.value)}
+                      className="w-full bg-slate-950/80 border border-slate-800/80 rounded-lg p-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition"
+                      placeholder="e.g. Mandatory Nutrition Build Video"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-400 mb-1.5 uppercase">Submission Due Date</label>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full bg-slate-950/80 border border-slate-800/80 rounded-lg p-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between gap-4">
+                  <button
+                    onClick={() => {
+                      if (!onAddAssignment) return;
+                      onAddAssignment({
+                        coachId: currentProfile.coachId || currentProfile.id || 'coach-system',
+                        teamId: currentProfile.teamId || '',
+                        type: 'module',
+                        title: customTitle || `Required Session: ${activeModule.title}`,
+                        dueDate: dueDate,
+                        moduleId: activeModule.id
+                      });
+                      setAssignSuccess(true);
+                      setTimeout(() => setAssignSuccess(false), 4000);
+                    }}
+                    className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-indigo-500/10"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Submit to Players' Schedule
+                  </button>
+                </div>
+
+                {assignSuccess && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-2.5 rounded-lg text-xs text-emerald-400 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 animate-bounce" />
+                    <span>Learning assignment dispatched successfully! Connected roster players can now review and complete this session under their logs.</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Renderer based on Module Type */}
             {activeModule.type === 'youtube' ? (

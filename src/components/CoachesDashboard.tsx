@@ -91,9 +91,7 @@ function PlayerPerformanceAccordion({
                 Performance Overview
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-mono mt-0.5">
-              Bound ID: {player.id} | Hierarchy Team: {player.teamId || 'Not Linked'}
-            </p>
+            {/* ID alignment tag removed */}
           </div>
         </div>
 
@@ -397,7 +395,7 @@ export default function CoachesDashboard({
       {/* Header and Organizational Context */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
         <h1 className="text-2xl font-sans font-bold text-slate-100">
-          Organization & Team Performance Hub
+          Team Performance Hub
         </h1>
       </div>
 

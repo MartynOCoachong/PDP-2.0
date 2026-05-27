@@ -312,23 +312,14 @@ export default function GPSRunTracker({ playerId, onSaveRun, activeAssignmentId,
                   </span>
                 </p>
 
-                <div className="flex flex-wrap justify-center gap-3 w-full">
+                <div className="flex justify-center w-full">
                   <button
                     onClick={() => startRun(false)}
                     id="btn-start-real-run"
-                    className="flex-1 min-w-[150px] bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition"
+                    className="w-full max-w-sm bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition"
                   >
                     <Play className="w-4 h-4 fill-slate-950" />
                     Start GPS Run
-                  </button>
-                  <button
-                    onClick={() => startRun(true)}
-                    id="btn-simulate-run"
-                    className="flex-1 min-w-[150px] bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-5 py-3 rounded-xl flex items-center justify-center gap-2 border border-slate-700 transition"
-                    title="Test run tracking directly from your desk with generated motion"
-                  >
-                    <Compass className="w-4 h-4 text-emerald-400 animate-spin" style={{ animationDuration: '3s' }} />
-                    Simulate Outdoor Run
                   </button>
                 </div>
               </div>

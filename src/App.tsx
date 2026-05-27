@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, BookOpen, User, Users, Landmark, Award, Database, Settings, HelpCircle, Flame, Droplet, Star, Calendar, RefreshCw, CloudLightning, Wifi, DatabaseZap, LogOut } from 'lucide-react';
+import { Shield, BookOpen, User, Users, Landmark, Award, Database, Settings, HelpCircle, Flame, Droplet, Star, Calendar, RefreshCw, CloudLightning, Wifi, DatabaseZap, LogOut, Menu, X } from 'lucide-react';
 import {
   UserProfile,
   Association,
@@ -38,6 +38,7 @@ import AdminDashboard from './components/AdminDashboard';
 import AssociationDashboard from './components/AssociationDashboard';
 import AuthScreen from './components/AuthScreen';
 import CoachOnboarding from './components/CoachOnboarding';
+import LeaderboardTab from './components/LeaderboardTab';
 
 // Firebase Client Imports
 import { db, auth, handleFirestoreError, OperationType } from './firebase';
@@ -79,7 +80,8 @@ export default function App() {
   });
 
   // Load persistent configurations or defaults
-  const [activeTab, setActiveTab ] = useState<'dashboard' | 'classroom' | 'coaches' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab ] = useState<'dashboard' | 'classroom' | 'coaches' | 'admin' | 'leaderboard'>('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Cloud Sync Connection Configuration States
   const [useFirestore, setUseFirestore] = useState<boolean>(true);
@@ -1919,39 +1921,49 @@ export default function App() {
       
       {/* Brand Header */}
       <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex justify-between items-center gap-4">
           
-          <div className="flex items-center gap-3">
+          {/* Logo and Brand */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <img 
-              src="https://i.ibb.co/SD3qJcNW/Untitled-design-4.png" 
+              src="https://i.ibb.co/GfHgRPwT/Untitled-design-5.png" 
               alt="Echelon Logo" 
-              className="h-[60px] w-[60px] object-contain rounded-xl shadow-lg shadow-emerald-500/10"
+              className="h-10 w-10 sm:h-12 sm:w-12 object-contain rounded-xl shadow-lg shadow-emerald-500/10"
               referrerPolicy="no-referrer"
             />
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold font-sans tracking-tight text-slate-100">
-                Player Development Portal
-              </h1>
-              <span className="text-[10px] uppercase font-mono bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                v2.4
-              </span>
-            </div>
+            <h1 className="text-sm sm:text-base md:text-lg font-bold font-sans tracking-tight text-slate-100">
+              Player Development Portal
+            </h1>
           </div>
 
-          {/* Secure access level markers */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5">
+          {/* Desktop Navigation */}
+          <div className="hidden sm:flex items-center gap-1.5 sm:gap-2">
             {currentProfile.role === 'association' ? (
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                id="nav-dashboard"
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-sans transition ${
-                  activeTab === 'dashboard'
-                    ? 'bg-slate-800 text-indigo-400 font-bold border border-slate-700'
-                    : 'text-slate-405 hover:bg-slate-850'
-                }`}
-              >
-                Association Dashboard
-              </button>
+              <>
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  id="nav-dashboard"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-sans transition ${
+                    activeTab === 'dashboard'
+                      ? 'bg-slate-800 text-indigo-400 font-bold border border-slate-700'
+                      : 'text-slate-405 hover:bg-slate-850'
+                  }`}
+                >
+                  Association Dashboard
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('leaderboard')}
+                  id="nav-leaderboard"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-sans transition ${
+                    activeTab === 'leaderboard'
+                      ? 'bg-slate-800 text-[#00bbff] font-bold border border-slate-700'
+                      : 'text-slate-405 hover:bg-slate-850'
+                  }`}
+                >
+                  Leaderboards
+                </button>
+              </>
             ) : (
               <>
                 <button
@@ -1966,19 +1978,31 @@ export default function App() {
                   Dashboard
                 </button>
 
-                {currentProfile.role === 'player' && (
+                {(currentProfile.role === 'player' || currentProfile.role === 'coach') && (
                   <button
                     onClick={() => setActiveTab('classroom')}
                     id="nav-classroom"
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-sans transition ${
                       activeTab === 'classroom'
                         ? 'bg-slate-800 text-[#00bbff] font-bold border border-slate-700'
-                        : 'text-slate-405 hover:bg-slate-855' // fallback matching hover and active structures
+                        : 'text-slate-405 hover:bg-slate-855'
                     }`}
                   >
-                    Classroom Tab
+                    Classroom
                   </button>
                 )}
+
+                <button
+                  onClick={() => setActiveTab('leaderboard')}
+                  id="nav-leaderboard"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-sans transition ${
+                    activeTab === 'leaderboard'
+                      ? 'bg-slate-800 text-[#00bbff] font-bold border border-slate-700'
+                      : 'text-slate-405 hover:bg-slate-850'
+                  }`}
+                >
+                  Leaderboard
+                </button>
               </>
             )}
 
@@ -2019,7 +2043,139 @@ export default function App() {
             </button>
           </div>
 
+          {/* Mobile Hamburger Button */}
+          <div className="flex sm:hidden">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 rounded-xl bg-slate-950/60 border border-slate-850 text-slate-400 hover:text-slate-200 transition focus:outline-none"
+              aria-label="Toggle navigation menu"
+            >
+              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+
         </div>
+
+        {/* Mobile Dropdown Menu Drawer */}
+        {isMobileMenuOpen && (
+          <div className="sm:hidden border-t border-slate-800 bg-slate-900/95 backdrop-blur-md px-4 py-3 space-y-2">
+            {currentProfile.role === 'association' ? (
+              <>
+                <button
+                  onClick={() => {
+                    setActiveTab('dashboard');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    activeTab === 'dashboard'
+                      ? 'bg-slate-850 text-indigo-400 border border-slate-750'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                  }`}
+                >
+                  Association Dashboard
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('leaderboard');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    activeTab === 'leaderboard'
+                      ? 'bg-slate-850 text-[#00bbff] border border-slate-750'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                  }`}
+                >
+                  Leaderboards
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setActiveTab('dashboard');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    activeTab === 'dashboard'
+                      ? 'bg-slate-850 text-emerald-400 border border-slate-750'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                  }`}
+                >
+                  Dashboard
+                </button>
+
+                {(currentProfile.role === 'player' || currentProfile.role === 'coach') && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('classroom');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                      activeTab === 'classroom'
+                        ? 'bg-slate-850 text-[#00bbff] border border-slate-750'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                    }`}
+                  >
+                    Classroom
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setActiveTab('leaderboard');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    activeTab === 'leaderboard'
+                      ? 'bg-slate-850 text-[#00bbff] border border-slate-750'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                  }`}
+                >
+                  Leaderboard
+                </button>
+              </>
+            )}
+
+            {currentProfile.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setActiveTab('admin');
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-between ${
+                  activeTab === 'admin'
+                    ? 'bg-slate-850 text-rose-500 border border-slate-750'
+                    : 'text-slate-404 hover:text-slate-200 hover:bg-slate-850'
+                }`}
+              >
+                <span className="flex items-center gap-1.5">Verification approvals</span>
+                {requests.filter(r => r.status === 'pending').length > 0 && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                )}
+              </button>
+            )}
+
+            <button
+              onClick={async () => {
+                setIsMobileMenuOpen(false);
+                if (useFirestore) {
+                  try {
+                    await signOut(auth);
+                  } catch (err) {
+                    console.error("Firebase Auth signOut failed:", err);
+                  }
+                }
+                localStorage.removeItem('echelon_current_profile');
+                setCurrentProfile(null);
+              }}
+              className="w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold text-rose-450 hover:bg-slate-850 hover:text-rose-400 transition flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Log Out
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Switching context banner indicator */}
@@ -2035,7 +2191,7 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-3 sm:pt-5 pb-8 space-y-6 sm:space-y-8">
         
         {/* Tab view controllers */}
         {activeTab === 'dashboard' && (
@@ -2066,7 +2222,7 @@ export default function App() {
               playerProfile={currentProfile}
               runLogs={runLogs.filter(r => r.playerId === currentProfile.id)}
               metrics={currentDailyMetric}
-              assignments={assignments.filter(a => a.teamId === currentProfile.teamId || a.teamId === '')}
+              assignments={assignments.filter(a => a.teamId === currentProfile.teamId || a.teamId === '' || a.playerId === currentProfile.id)}
               modules={modules}
               completions={completions.filter(c => c.playerId === currentProfile.id)}
               onSaveRun={handleSaveRun}
@@ -2076,6 +2232,10 @@ export default function App() {
                   setActiveTab('classroom');
                 }
               }}
+              allPlayers={users}
+              allRunLogs={runLogs}
+              allMetrics={allMetrics}
+              allCompletions={completions}
             />
           )
         )}
@@ -2085,6 +2245,19 @@ export default function App() {
             modules={modules}
             completions={completions.filter(c => c.playerId === currentProfile.id)}
             onCompleteModule={handleCompleteModule}
+            currentProfile={currentProfile}
+            onAddAssignment={handleAddAssignment}
+            assignments={assignments.filter(a => a.teamId === currentProfile.teamId || a.teamId === '' || a.playerId === currentProfile.id)}
+          />
+        )}
+
+        {activeTab === 'leaderboard' && (
+          <LeaderboardTab
+            currentProfile={currentProfile}
+            players={users}
+            runLogs={runLogs}
+            allMetrics={allMetrics}
+            completions={completions}
           />
         )}
 
@@ -2104,8 +2277,8 @@ export default function App() {
       </main>
 
       <footer className="bg-slate-900 border-t border-slate-800/80 py-6 text-center text-xs font-mono text-slate-500 mt-12">
-        <p>© 2026 Echelon Sports Networks. Secured Athlete Governance & Hierarchy Access Levels.</p>
-        <p className="mt-1 text-[11px] text-slate-600">Built using high-contrast slate layouts with native micro-animations.</p>
+        <p>© 2026 PDP Sports Network. All rights reserved.</p>
+        <p>Secured platform · Role-based access · Athlete data protected.</p>
       </footer>
 
     </div>

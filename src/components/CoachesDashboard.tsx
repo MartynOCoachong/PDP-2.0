@@ -409,9 +409,18 @@ export default function CoachesDashboard({
       {/* Header and Organizational Context */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 relative overflow-hidden">
         <div>
-          <h1 className="text-2xl font-sans font-bold text-slate-100">
-            Team Performance Hub
-          </h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-sans font-bold text-slate-100">
+              Team Performance Hub
+            </h1>
+            <span className={`px-2 py-0.5 rounded-md text-[9px] font-mono font-bold uppercase tracking-wider ${
+              currentProfile?.coachRole === 'assistant'
+                ? 'bg-[#00BBFF]/15 text-[#00BBFF] border border-[#00BBFF]/30'
+                : 'bg-indigo-505/15 text-indigo-405 border border-indigo-505/30'
+            }`}>
+              {currentProfile?.coachRole === 'assistant' ? 'Assistant Coach' : 'Head Coach'}
+            </span>
+          </div>
           {myCoachedTeams.length > 0 && (
             <p className="text-xs font-mono text-slate-400 mt-1 uppercase tracking-wider">
               Viewing Roster for: <span className="text-emerald-400 font-bold font-sans">{(teams || []).find(t => t.id === activeTeamId)?.name || activeTeamId || 'None'}</span>

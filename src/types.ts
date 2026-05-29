@@ -21,6 +21,7 @@ export interface UserProfile {
   childPlayerId?: string; // If parent, links to their child player's user ID
   childPlayerIds?: string[]; // If parent, links to multiple children user IDs
   parentUserId?: string;  // If player, links to their parent's user ID
+  coachRole?: 'head' | 'assistant'; // Whether coach is Head or Assistant
 }
 
 export interface Association {
@@ -70,6 +71,7 @@ export interface Coach {
   email: string;
   teamId: string;       // Coach is linked to team
   teamIds?: string[];    // Coach can be linked to multiple teams
+  coachRole?: 'head' | 'assistant'; // Whether coach is Head or Assistant
   approved: boolean;
 
   // Custom schema fields required by user/associated with the sync model

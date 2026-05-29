@@ -1786,6 +1786,7 @@ export default function App() {
     password?: string;
     teamId?: string; 
     teamIds?: string[];
+    coachRole: 'head' | 'assistant';
     staySignedIn: boolean; 
   }) => {
     let clId = `user-coach-${Date.now()}`;
@@ -1839,6 +1840,7 @@ export default function App() {
       coachId: coachId,
       teamId: firstTeamId || undefined,
       teamIds: finalTeamIds,
+      coachRole: fields.coachRole,
       clubId: resolvedClubId,
       associationId: resolvedAssocId,
       approved: true
@@ -1853,6 +1855,7 @@ export default function App() {
       email: fields.email,
       teamId: firstTeamId,
       teamIds: finalTeamIds,
+      coachRole: fields.coachRole,
       approved: true,
       UUID: coachId,
       coach: fields.name,

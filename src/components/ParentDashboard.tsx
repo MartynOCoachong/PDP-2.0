@@ -320,7 +320,9 @@ export default function ParentDashboard({
               Coach
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] text-slate-500 font-mono uppercase leading-none">TEAM COACH</p>
+              <p className="text-[10px] text-slate-500 font-mono uppercase leading-none">
+                {childCoach?.coachRole === 'assistant' ? 'Assistant Coach' : 'Head Coach'}
+              </p>
               <p className="text-xs font-bold text-slate-250 truncate mt-1">
                 {childCoach ? childCoach.name : 'Unassigned/Independent'}
               </p>

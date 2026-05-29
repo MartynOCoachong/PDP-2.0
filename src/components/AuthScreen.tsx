@@ -55,6 +55,7 @@ interface AuthScreenProps {
     password?: string;
     teamId?: string; 
     teamIds?: string[];
+    coachRole: 'head' | 'assistant';
     staySignedIn: boolean; 
   }) => Promise<void>;
   onAssociationSignup: (fields: { 
@@ -115,6 +116,7 @@ export default function AuthScreen({
   // Coach Signup Inputs
   const [coachTeamId, setCoachTeamId] = useState('');
   const [coachTeamIds, setCoachTeamIds] = useState<string[]>([]);
+  const [coachRole, setCoachRole] = useState<'head' | 'assistant'>('head');
 
   // Association Signup Inputs
   const [associationName, setAssociationName] = useState('');
@@ -215,6 +217,7 @@ export default function AuthScreen({
           password,
           teamId: coachTeamIds[0] || undefined,
           teamIds: coachTeamIds,
+          coachRole,
           staySignedIn
         });
       } else if (selectedRole === 'association') {
@@ -783,7 +786,39 @@ export default function AuthScreen({
 
                 {/* ROLE PATH 2: Coach selection logic */}
                 {selectedRole === 'coach' && (
-                  <div className="p-4 bg-slate-950 border border-slate-850 rounded-2xl space-y-3">
+                  <div className="p-4 bg-slate-950 border border-slate-850 rounded-2xl space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-405 uppercase tracking-wider mb-2">
+                        COACHING ASSIGNMENT ROLE
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setCoachRole('head')}
+                          className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center gap-1 ${
+                            coachRole === 'head'
+                              ? 'bg-indigo-600/15 border-indigo-505 text-indigo-405'
+                              : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
+                          }`}
+                        >
+                          <span className="font-sans font-black">Head Coach</span>
+                          <span className="text-[9px] font-mono font-medium opacity-80 uppercase">TACTICAL LEADER</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCoachRole('assistant')}
+                          className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center gap-1 ${
+                            coachRole === 'assistant'
+                              ? 'bg-[#00BBFF]/15 border-[#00BBFF]/60 text-[#00BBFF]'
+                              : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
+                          }`}
+                        >
+                          <span className="font-sans font-black">Assistant Coach</span>
+                          <span className="text-[9px] font-mono font-medium opacity-80 uppercase">SUPPORT STAFF</span>
+                        </button>
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-[10px] font-mono text-slate-405 uppercase tracking-wider mb-2">
                         SELECT ASSIGNED TEAMS (You can select multiple!)

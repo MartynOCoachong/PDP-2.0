@@ -557,9 +557,18 @@ export default function AdminDashboard({
                                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-1">
                                                     {teamCoaches.map((co) => (
                                                       <div key={co.id} className="p-2 bg-slate-900 border border-slate-850 rounded flex items-center gap-2">
-                                                        <Award className="w-3.5 h-3.5 text-emerald-450 shrink-0" />
-                                                        <div className="min-w-0">
-                                                          <div className="text-xs font-bold text-slate-200 truncate">{co.name}</div>
+                                                        <Award className="w-3.5 h-3.5 text-emerald-455 shrink-0" />
+                                                        <div className="min-w-0 flex-1">
+                                                          <div className="text-xs font-bold text-slate-200 truncate flex items-center gap-1.5">
+                                                            <span className="truncate">{co.name}</span>
+                                                            <span className={`px-1 py-0.2 rounded text-[7.5px] font-mono font-bold uppercase shrink-0 ${
+                                                              co.coachRole === 'assistant'
+                                                                ? 'bg-[#00BBFF]/15 text-[#00BBFF]'
+                                                                : 'bg-indigo-505/15 text-indigo-405'
+                                                            }`}>
+                                                              {co.coachRole === 'assistant' ? 'Asst' : 'Head'}
+                                                            </span>
+                                                          </div>
                                                           <div className="text-[9.5px] text-slate-500 font-mono truncate">{co.email}</div>
                                                         </div>
                                                       </div>

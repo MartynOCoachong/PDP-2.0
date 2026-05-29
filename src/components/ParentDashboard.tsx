@@ -76,11 +76,37 @@ export default function ParentDashboard({
   const [editFat, setEditFat] = useState(35);
   const [editRunGoal, setEditRunGoal] = useState(15.0);
   
+   // Dynamic additional children and switcher resolution
+  const myChildren = useMemo(() => {
+    const childIds = new Set<string>();
+    if (parentProfile.childPlayerId) {
+      childIds.add(parentProfile.childPlayerId);
+    }
+    if (parentProfile.childPlayerIds) {
+      parentProfile.childPlayerIds.forEach(id => childIds.add(id));
+    }
+    // Also scan allPlayers in case any players have parentUserId set to this parent's ID
+    allPlayers.forEach(p => {
+      if (p.parentUserId === parentProfile.id) {
+        childIds.add(p.id);
+      }
+    });
+    return allPlayers.filter(p => childIds.has(p.id));
+  }, [allPlayers, parentProfile.childPlayerId, parentProfile.childPlayerIds, parentProfile.id]);
+
+  const [selectedChildId, setSelectedChildId] = useState<string>(() => {
+    if (parentProfile.childPlayerId) return parentProfile.childPlayerId;
+    if (parentProfile.childPlayerIds && parentProfile.childPlayerIds.length > 0) return parentProfile.childPlayerIds[0];
+    // fallback scan
+    const found = allPlayers.find(p => p.parentUserId === parentProfile.id);
+    return found ? found.id : '';
+  });
+
   // Look up Child profile
   const childPlayer = useMemo(() => {
-    if (!parentProfile.childPlayerId) return null;
-    return allPlayers.find(p => p.id === parentProfile.childPlayerId);
-  }, [allPlayers, parentProfile.childPlayerId]);
+    if (!selectedChildId) return null;
+    return allPlayers.find(p => p.id === selectedChildId);
+  }, [allPlayers, selectedChildId]);
 
   // Find coach and team details for the child player
   const childCoach = useMemo(() => {
@@ -271,7 +297,7 @@ export default function ParentDashboard({
     <div className="space-y-6 sm:space-y-8 animate-fadeIn">
       
       {/* 1. Parent Banner Welcome Area */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/20 to-slate-900 rounded-3xl border border-slate-850 p-6 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/20 to-slate-900 rounded-3xl border border-slate-850 p-6 relative overflow-hidden space-y-6">
         <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
@@ -284,12 +310,12 @@ export default function ParentDashboard({
             </div>
             <h1 className="text-2xl font-black font-sans text-slate-100">Welcome, {parentProfile.name}</h1>
             <p className="text-xs text-slate-400 font-medium">
-              Monitoring performance of your youth athlete <b className="text-slate-200">{childPlayer.name}</b>
+              Monitoring performance of your youth athlete <b className="text-[#00bbff]">{childPlayer.name}</b>
             </p>
           </div>
 
           {/* Connected Coach & Crew Info Container */}
-          <div className="flex items-center gap-3 bg-slate-950/90 border border-slate-850 p-3 rounded-2xl max-w-xs">
+          <div className="flex items-center gap-3 bg-slate-950/90 border border-slate-850 p-3 rounded-2xl max-w-xs md:w-64">
             <div className="bg-gradient-to-r from-indigo-505 to-sky-505 w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shrink-0 text-xs shadow-md">
               Coach
             </div>
@@ -304,6 +330,29 @@ export default function ParentDashboard({
             </div>
           </div>
         </div>
+
+        {/* Child Selector Row if multiple children are registered */}
+        {myChildren.length > 1 && (
+          <div className="pt-4 border-t border-slate-855 flex flex-wrap items-center gap-3">
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Select Athlete:</span>
+            <div className="flex flex-wrap gap-2">
+              {myChildren.map(child => (
+                <button
+                  key={child.id}
+                  onClick={() => setSelectedChildId(child.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold font-sans transition-all flex items-center gap-2 ${
+                    selectedChildId === child.id
+                      ? 'bg-[#00BBFF]/15 text-[#00BBFF] border border-[#00BBFF]/30'
+                      : 'bg-slate-950/60 border border-slate-850 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${selectedChildId === child.id ? 'bg-[#00BBFF]' : 'bg-slate-600'}`} />
+                  {child.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Success Notification Bar */}

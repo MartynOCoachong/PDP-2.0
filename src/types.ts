@@ -13,11 +13,13 @@ export interface UserProfile {
   associationId?: string; // Linked association
   clubId?: string;        // Linked club
   teamId?: string;        // Linked team
+  teamIds?: string[];      // Multiple teams
   coachId?: string;       // Linked coach ID (if coach is registered)
   manualCoachName?: string; // If player inputs coach that is not on the app
   manualCoachEmail?: string; // email of manual coach
   approved: boolean;      // Admins approve new associations, clubs, teams, coaches profiles
   childPlayerId?: string; // If parent, links to their child player's user ID
+  childPlayerIds?: string[]; // If parent, links to multiple children user IDs
   parentUserId?: string;  // If player, links to their parent's user ID
 }
 
@@ -67,6 +69,7 @@ export interface Coach {
   name: string;
   email: string;
   teamId: string;       // Coach is linked to team
+  teamIds?: string[];    // Coach can be linked to multiple teams
   approved: boolean;
 
   // Custom schema fields required by user/associated with the sync model

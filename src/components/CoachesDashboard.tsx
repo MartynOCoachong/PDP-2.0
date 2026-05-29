@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Users, Award, Calendar, ChevronRight, ChevronDown, Activity, Plus, Check, Clock, User, Sparkles, Filter, Database, Droplet, Star, ShieldAlert } from 'lucide-react';
-import { UserProfile, RunLog, DailyMetrics, Assignment, EducationalModule } from '../types';
+import { UserProfile, RunLog, DailyMetrics, Assignment, EducationalModule, Team } from '../types';
 
 interface CoachesDashboardProps {
   currentProfile: UserProfile;
@@ -16,6 +16,8 @@ interface CoachesDashboardProps {
   modules: EducationalModule[];
   onAddAssignment: (assignment: Omit<Assignment, 'id' | 'completedByPlayerIds'>) => void;
   onUpdatePlayerGoal?: (playerId: string, updatedGoals: Partial<DailyMetrics>) => void;
+  teams?: Team[];
+  onChangeActiveTeam?: (newTeamId: string) => void;
 }
 
 interface PlayerAccordionProps {
@@ -254,6 +256,8 @@ export default function CoachesDashboard({
   metrics,
   assignments,
   modules,
+  teams,
+  onChangeActiveTeam,
   onAddAssignment,
   onUpdatePlayerGoal
 }: CoachesDashboardProps) {
@@ -261,6 +265,13 @@ export default function CoachesDashboard({
   const [selectedClubId, setSelectedClubId] = useState<string>('');
   const [selectedTeamId, setSelectedTeamId] = useState<string>(currentProfile.teamId || '');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
+
+  useEffect(() => {
+    setSelectedTeamId(currentProfile.teamId || '');
+  }, [currentProfile.teamId]);
+
+  const coachTeamIdsObj = currentProfile.teamIds || (currentProfile.teamId ? [currentProfile.teamId] : []);
+  const myCoachedTeams = (teams || []).filter(t => coachTeamIdsObj.includes(t.id));
 
   // Accordion open/close states
   const [expandedPlayerIds, setExpandedPlayerIds] = useState<Record<string, boolean>>({});
@@ -307,7 +318,8 @@ export default function CoachesDashboard({
       return player.teamId === currentProfile.teamId;
     }
     if (currentProfile.role === 'coach') {
-      return player.coachId === currentProfile.coachId || player.teamId === currentProfile.teamId;
+      const isMyTeam = (currentProfile.teamIds && player.teamId ? currentProfile.teamIds.includes(player.teamId) : false) || player.teamId === currentProfile.teamId;
+      return player.coachId === currentProfile.coachId || isMyTeam;
     }
     // Admin has total access
     return true;
@@ -395,10 +407,40 @@ export default function CoachesDashboard({
   return (
     <div className="space-y-6">
       {/* Header and Organizational Context */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <h1 className="text-2xl font-sans font-bold text-slate-100">
-          Team Performance Hub
-        </h1>
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 relative overflow-hidden">
+        <div>
+          <h1 className="text-2xl font-sans font-bold text-slate-100">
+            Team Performance Hub
+          </h1>
+          {myCoachedTeams.length > 0 && (
+            <p className="text-xs font-mono text-slate-400 mt-1 uppercase tracking-wider">
+              Viewing Roster for: <span className="text-emerald-400 font-bold font-sans">{(teams || []).find(t => t.id === activeTeamId)?.name || activeTeamId || 'None'}</span>
+            </p>
+          )}
+        </div>
+
+        {myCoachedTeams.length >= 2 && (
+          <div className="flex items-center gap-x-2.5 bg-slate-950/45 p-2 px-3 rounded-xl border border-slate-800 shrink-0">
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
+              Switch Squad:
+            </span>
+            <select
+              value={activeTeamId}
+              onChange={(e) => {
+                const newId = e.target.value;
+                setSelectedTeamId(newId);
+                if (onChangeActiveTeam) onChangeActiveTeam(newId);
+              }}
+              className="bg-slate-900 border border-slate-800 text-xs text-slate-200 font-bold rounded-lg px-3 py-1.5 focus:border-emerald-500 outline-none transition"
+            >
+              {myCoachedTeams.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

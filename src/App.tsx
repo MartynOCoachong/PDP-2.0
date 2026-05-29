@@ -1396,6 +1396,7 @@ export default function App() {
       name: currentProfile.name,
       email: currentProfile.email,
       teamId: targetTeamId,
+      teamIds: [targetTeamId],
       approved: true,
       UUID: existingCoachId,
       coach: currentProfile.name,
@@ -1417,6 +1418,7 @@ export default function App() {
       ...currentProfile,
       coachId: existingCoachId,
       teamId: targetTeamId,
+      teamIds: [targetTeamId],
       clubId: targetClubId,
       associationId: targetAssocId
     };
@@ -1439,11 +1441,36 @@ export default function App() {
     }
   };
 
+  const handleSwitchActiveTeam = async (newTeamId: string) => {
+    if (!currentProfile || currentProfile.role !== 'coach') return;
+    
+    const updatedProfile: UserProfile = {
+      ...currentProfile,
+      teamId: newTeamId
+    };
+
+    if (useFirestore) {
+      try {
+        await setDoc(doc(db, 'users', currentProfile.id), updatedProfile);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `users/${currentProfile.id}`);
+      }
+    } else {
+      setUsers(prev => prev.map(u => u.id === currentProfile.id ? updatedProfile : u));
+    }
+
+    setCurrentProfile(updatedProfile);
+    if (localStorage.getItem('echelon_current_profile')) {
+      localStorage.setItem('echelon_current_profile', JSON.stringify(updatedProfile));
+    }
+  };
+
   const handlePlayerSignup = async (fields: { 
     name: string; 
     email: string; 
     password?: string;
     coachId?: string; 
+    teamId?: string;
     staySignedIn: boolean; 
   }) => {
     let plId = `user-player-${Date.now()}`;
@@ -1469,13 +1496,16 @@ export default function App() {
       matchCoach = coaches.find(c => c.id === fields.coachId);
     }
 
-    let resolvedTeamId = undefined;
+    let resolvedTeamId = fields.teamId;
     let resolvedClubId = undefined;
     let resolvedAssocId = undefined;
 
-    if (matchCoach) {
+    if (!resolvedTeamId && matchCoach) {
       resolvedTeamId = matchCoach.teamId;
-      const matchTeam = teams.find(t => t.id === matchCoach.teamId);
+    }
+
+    if (resolvedTeamId) {
+      const matchTeam = teams.find(t => t.id === resolvedTeamId);
       if (matchTeam) {
         resolvedClubId = matchTeam.clubId;
         const matchClub = clubs.find(c => c.id === matchTeam.clubId);
@@ -1534,6 +1564,13 @@ export default function App() {
     playerName: string;
     playerEmail: string; 
     coachId?: string; 
+    teamId?: string;
+    additionalChildren?: Array<{
+      playerName: string;
+      playerEmail: string;
+      coachId?: string;
+      teamId?: string;
+    }>;
     staySignedIn: boolean; 
   }) => {
     let parentId = `user-parent-${Date.now()}`;
@@ -1555,26 +1592,33 @@ export default function App() {
       }
     }
 
-    let matchCoach = undefined;
-    if (fields.coachId) {
-      matchCoach = coaches.find(c => c.id === fields.coachId);
-    }
-
-    let resolvedTeamId = undefined;
-    let resolvedClubId = undefined;
-    let resolvedAssocId = undefined;
-
-    if (matchCoach) {
-      resolvedTeamId = matchCoach.teamId;
-      const matchTeam = teams.find(t => t.id === matchCoach.teamId);
-      if (matchTeam) {
-        resolvedClubId = matchTeam.clubId;
-        const matchClub = clubs.find(c => c.id === matchTeam.clubId);
-        if (matchClub) {
-          resolvedAssocId = matchClub.associationId;
+    const resolveTeamHierarchy = (coachId?: string, teamId?: string) => {
+      let resolvedTeamId = teamId || undefined;
+      if (!resolvedTeamId && coachId) {
+        const mc = coaches.find(c => c.id === coachId);
+        if (mc) {
+          resolvedTeamId = mc.teamId;
         }
       }
-    }
+
+      let resolvedClubId = undefined;
+      let resolvedAssocId = undefined;
+
+      if (resolvedTeamId) {
+        const matchTeam = teams.find(t => t.id === resolvedTeamId);
+        if (matchTeam) {
+          resolvedClubId = matchTeam.clubId;
+          const matchClub = clubs.find(c => c.id === matchTeam.clubId);
+          if (matchClub) {
+            resolvedAssocId = matchClub.associationId;
+          }
+        }
+      }
+
+      return { teamId: resolvedTeamId, clubId: resolvedClubId, associationId: resolvedAssocId };
+    };
+
+    const primaryHierarchy = resolveTeamHierarchy(fields.coachId, fields.teamId);
 
     const playerProfile: UserProfile = {
       id: playerId,
@@ -1582,9 +1626,9 @@ export default function App() {
       email: fields.playerEmail,
       role: 'player',
       coachId: fields.coachId || undefined,
-      teamId: resolvedTeamId,
-      clubId: resolvedClubId,
-      associationId: resolvedAssocId,
+      teamId: primaryHierarchy.teamId,
+      clubId: primaryHierarchy.clubId,
+      associationId: primaryHierarchy.associationId,
       approved: true,
       parentUserId: parentId
     };
@@ -1601,30 +1645,77 @@ export default function App() {
       create_at: new Date().toISOString()
     };
 
+    // Prepare arrays of profiles & entities to save
+    const playerProfilesToSave: UserProfile[] = [playerProfile];
+    const playersToSave: Player[] = [newPlayer];
+    const childPlayerIdsList: string[] = [playerId];
+
+    if (fields.additionalChildren && fields.additionalChildren.length > 0) {
+      fields.additionalChildren.forEach((ac, index) => {
+        const acId = `user-player-${Date.now()}-add-${index}`;
+        const acHierarchy = resolveTeamHierarchy(ac.coachId, ac.teamId);
+        
+        const acProfile: UserProfile = {
+          id: acId,
+          name: ac.playerName,
+          email: ac.playerEmail,
+          role: 'player',
+          coachId: ac.coachId || undefined,
+          teamId: acHierarchy.teamId,
+          clubId: acHierarchy.clubId,
+          associationId: acHierarchy.associationId,
+          approved: true,
+          parentUserId: parentId
+        };
+
+        const acPlayer: Player = {
+          id: acId,
+          name: ac.playerName,
+          email: ac.playerEmail,
+          coachId: ac.coachId || '',
+          approved: true,
+          UUID: acId,
+          player_name: ac.playerName,
+          player_email: ac.playerEmail,
+          create_at: new Date().toISOString()
+        };
+
+        playerProfilesToSave.push(acProfile);
+        playersToSave.push(acPlayer);
+        childPlayerIdsList.push(acId);
+      });
+    }
+
     const parentProfile: UserProfile = {
       id: parentId,
       name: fields.parentName,
       email: fields.parentEmail,
       role: 'parent',
       coachId: fields.coachId || undefined,
-      teamId: resolvedTeamId,
-      clubId: resolvedClubId,
-      associationId: resolvedAssocId,
+      teamId: primaryHierarchy.teamId,
+      clubId: primaryHierarchy.clubId,
+      associationId: primaryHierarchy.associationId,
       approved: true,
-      childPlayerId: playerId
+      childPlayerId: playerId,
+      childPlayerIds: childPlayerIdsList
     };
 
     if (useFirestore) {
       try {
-        await setDoc(doc(db, 'users', playerId), playerProfile);
-        await setDoc(doc(db, 'players', playerId), newPlayer);
+        // Save additional children docs, primary doc, and parent doc
+        for (const pProf of playerProfilesToSave) {
+          await setDoc(doc(db, 'users', pProf.id), pProf);
+        }
+        for (const pl of playersToSave) {
+          await setDoc(doc(db, 'players', pl.id), pl);
+        }
         await setDoc(doc(db, 'users', parentId), parentProfile);
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `users/${parentId}`);
       }
     } else {
-      setUsers(prev => [...prev, playerProfile, parentProfile]);
-      setPlayers(prev => [...prev, newPlayer]);
+      setUsers(prev => [...prev, ...playerProfilesToSave, parentProfile]);
+      setPlayers(prev => [...prev, ...playersToSave]);
     }
 
     setCurrentProfile(parentProfile);
@@ -1694,6 +1785,7 @@ export default function App() {
     email: string; 
     password?: string;
     teamId?: string; 
+    teamIds?: string[];
     staySignedIn: boolean; 
   }) => {
     let clId = `user-coach-${Date.now()}`;
@@ -1718,13 +1810,18 @@ export default function App() {
     const existingCoach = coaches.find(c => c.email.toLowerCase().trim() === normalizedEmail);
 
     const coachId = existingCoach ? existingCoach.id : `coach-${Date.now()}`;
-    const finalTeamId = existingCoach ? (existingCoach.teamId || fields.teamId) : fields.teamId;
+    const coachTeamIdsSaved = fields.teamIds || (fields.teamId ? [fields.teamId] : []);
+    const finalTeamIds = existingCoach 
+      ? (existingCoach.teamIds || (existingCoach.teamId ? [existingCoach.teamId] : [])) 
+      : coachTeamIdsSaved;
+
+    const firstTeamId = finalTeamIds[0] || '';
 
     let resolvedClubId = undefined;
     let resolvedAssocId = undefined;
 
-    if (finalTeamId) {
-      const matchTeam = teams.find(t => t.id === finalTeamId);
+    if (firstTeamId) {
+      const matchTeam = teams.find(t => t.id === firstTeamId);
       if (matchTeam) {
         resolvedClubId = matchTeam.clubId;
         const matchClub = clubs.find(c => c.id === matchTeam.clubId);
@@ -1740,20 +1837,22 @@ export default function App() {
       email: fields.email,
       role: 'coach',
       coachId: coachId,
-      teamId: finalTeamId || undefined,
+      teamId: firstTeamId || undefined,
+      teamIds: finalTeamIds,
       clubId: resolvedClubId,
       associationId: resolvedAssocId,
       approved: true
     };
 
-    const matchingTeam = teams.find(t => t.id === (finalTeamId || ''));
-    const teamName = matchingTeam ? matchingTeam.name : (finalTeamId || '');
+    const matchingTeam = teams.find(t => t.id === firstTeamId);
+    const teamName = matchingTeam ? matchingTeam.name : firstTeamId;
 
     const coachEntity: Coach = {
       id: coachId,
       name: fields.name,
       email: fields.email,
-      teamId: finalTeamId || '',
+      teamId: firstTeamId,
+      teamIds: finalTeamIds,
       approved: true,
       UUID: coachId,
       coach: fields.name,
@@ -1943,7 +2042,7 @@ export default function App() {
   const handleGoogleSignIn = async (
     role?: UserRole, 
     customName?: string, 
-    payload?: { coachId?: string; teamId?: string; associationName?: string }
+    payload?: { coachId?: string; teamId?: string; teamIds?: string[]; associationName?: string }
   ) => {
     if (!useFirestore) {
       throw new Error("Unable to run Google Auth on offline storage emulation mode.");
@@ -1976,21 +2075,24 @@ export default function App() {
         };
 
         if (finalRole === 'player') {
-          let resolvedTeamId = undefined;
+          let resolvedTeamId = payload?.teamId;
           let resolvedClubId = undefined;
           let resolvedAssocId = undefined;
 
-          if (payload?.coachId) {
+          if (!resolvedTeamId && payload?.coachId) {
             const matchCoach = coaches.find(c => c.id === payload.coachId);
             if (matchCoach) {
               resolvedTeamId = matchCoach.teamId;
-              const matchTeam = teams.find(t => t.id === matchCoach.teamId);
-              if (matchTeam) {
-                resolvedClubId = matchTeam.clubId;
-                const matchClub = clubs.find(c => c.id === matchTeam.clubId);
-                if (matchClub) {
-                  resolvedAssocId = matchClub.associationId;
-                }
+            }
+          }
+
+          if (resolvedTeamId) {
+            const matchTeam = teams.find(t => t.id === resolvedTeamId);
+            if (matchTeam) {
+              resolvedClubId = matchTeam.clubId;
+              const matchClub = clubs.find(c => c.id === matchTeam.clubId);
+              if (matchClub) {
+                resolvedAssocId = matchClub.associationId;
               }
             }
           }
@@ -2009,8 +2111,11 @@ export default function App() {
           let resolvedClubId = undefined;
           let resolvedAssocId = undefined;
 
-          if (payload?.teamId) {
-            const matchTeam = teams.find(t => t.id === payload.teamId);
+          const coachTeamIdsSaved = payload?.teamIds || (payload?.teamId ? [payload.teamId] : []);
+          const firstTeamId = coachTeamIdsSaved[0] || '';
+
+          if (firstTeamId) {
+            const matchTeam = teams.find(t => t.id === firstTeamId);
             if (matchTeam) {
               resolvedClubId = matchTeam.clubId;
               const matchClub = clubs.find(c => c.id === matchTeam.clubId);
@@ -2023,7 +2128,8 @@ export default function App() {
           newProfile = {
             ...newProfile,
             coachId: coachId,
-            teamId: payload?.teamId || undefined,
+            teamId: firstTeamId || undefined,
+            teamIds: coachTeamIdsSaved,
             clubId: resolvedClubId,
             associationId: resolvedAssocId
           };
@@ -2032,8 +2138,14 @@ export default function App() {
             id: coachId,
             name: finalName,
             email: normalizedEmail,
-            teamId: payload?.teamId || '',
-            approved: true
+            teamId: firstTeamId,
+            teamIds: coachTeamIdsSaved,
+            approved: true,
+            UUID: coachId,
+            coach: finalName,
+            coach_email: normalizedEmail,
+            team: firstTeamId ? (teams.find(t => t.id === firstTeamId)?.name || firstTeamId) : '',
+            create_at: new Date().toISOString()
           };
 
           const batch = writeBatch(db);
@@ -2449,6 +2561,43 @@ export default function App() {
         )}
       </header>
 
+      {/* Switching context banner indicator */}
+      <div className="bg-slate-950 border-b border-slate-900 py-2.5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 text-xs font-mono w-full">
+          <div className="flex flex-wrap items-center gap-2 text-slate-400">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
+            <span>Logged profile: <b className="text-slate-200">{currentProfile.name}</b></span>
+            <span className="text-slate-700">|</span>
+            <span>Role: <b className="text-slate-200 uppercase">{currentProfile.role}</b></span>
+            {currentProfile.role === 'coach' && currentProfile.teamIds && currentProfile.teamIds.length > 0 && (
+              <>
+                <span className="text-slate-700">|</span>
+                <span>Active Squad: <b className="text-slate-200 font-sans">{teams.find(t => t.id === currentProfile.teamId)?.name || currentProfile.teamId || 'None'}</b></span>
+              </>
+            )}
+          </div>
+          {currentProfile.role === 'coach' && currentProfile.teamIds && currentProfile.teamIds.length >= 2 && (
+            <div className="flex items-center gap-2 mt-1 md:mt-0">
+              <span className="text-slate-400 uppercase tracking-widest text-[9px] font-mono">Focus Team:</span>
+              <select
+                value={currentProfile.teamId || ''}
+                onChange={(e) => handleSwitchActiveTeam(e.target.value)}
+                className="bg-slate-900 border border-slate-800 text-xs text-slate-200 rounded px-2.5 py-1 font-sans outline-none focus:border-indigo-500 transition"
+              >
+                {currentProfile.teamIds.map(tid => {
+                  const matchingT = teams.find(t => t.id === tid);
+                  return (
+                    <option key={tid} value={tid}>
+                      {matchingT ? matchingT.name : tid}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-3 sm:pt-5 pb-8 space-y-6 sm:space-y-8">
         
@@ -2487,6 +2636,8 @@ export default function App() {
               metrics={allMetrics}
               assignments={assignments}
               modules={modules}
+              teams={teams}
+              onChangeActiveTeam={handleSwitchActiveTeam}
               onAddAssignment={handleAddAssignment}
               onUpdatePlayerGoal={handleUpdatePlayerGoal}
             />

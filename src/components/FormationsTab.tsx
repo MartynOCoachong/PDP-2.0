@@ -271,6 +271,14 @@ export default function FormationsTab({
   const teamIdToFilter = currentProfile.teamId || '';
   const myTeamPlayers = players.filter(p => p.role === 'player' && p.teamId === teamIdToFilter);
 
+  // Helper dictionary mapping playerId to PlayerProfile object
+  const playersLookup = React.useMemo(() => {
+    return players.reduce((acc, p) => {
+      acc[p.id] = p;
+      return acc;
+    }, {} as Record<string, UserProfile>);
+  }, [players]);
+
   // States
   const [selectedSystem, setSelectedSystem] = useState<'5v5' | '6v6' | '7v7' | '9v9' | '11v11'>('11v11');
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
@@ -332,7 +340,9 @@ export default function FormationsTab({
 
     const loadedMap: Record<string, string | null> = {};
     f.assignments.forEach(as => {
-      loadedMap[as.positionId] = as.playerId;
+      // Ensure player belongs to the current active team
+      const isValidPlayer = as.playerId && playersLookup[as.playerId]?.teamId === currentProfile.teamId;
+      loadedMap[as.positionId] = isValidPlayer ? as.playerId : null;
     });
     setLiveAssignments(loadedMap);
     setActiveSlotId(null);
@@ -377,12 +387,14 @@ export default function FormationsTab({
     try {
       // Build final schema compliant elements
       const finalAssignmentsList: FormationAssignment[] = currentPreset.assignments.map(as => {
+        const assignedId = liveAssignments[as.positionId] || null;
+        const isValidPlayer = assignedId && playersLookup[assignedId]?.teamId === currentProfile.teamId;
         return {
           positionId: as.positionId,
           positionName: as.positionName,
           x: as.x,
           y: as.y,
-          playerId: liveAssignments[as.positionId] || null
+          playerId: isValidPlayer ? assignedId : null
         };
       });
 
@@ -418,6 +430,35 @@ export default function FormationsTab({
   const activeTeamFormations = React.useMemo(() => {
     return formations.filter(f => f.teamId === currentProfile.teamId);
   }, [formations, currentProfile.teamId]);
+
+  // Whenever the active teamId changes, completely reset the builder state
+  // to avoid carrying over player assignments, loaded formation ID, or names from the old team.
+  React.useEffect(() => {
+    // 1. Reset loaded formation tracking, deletes, notes & slots
+    setLoadedFormationId(null);
+    setHasAutoLoaded(false);
+    setHasLoadedInitial(false);
+    setConfirmDeleteId(null);
+    setNotes('');
+    setActiveSlotId(null);
+
+    // 2. See if there are saved formations for the new team.
+    // If not, apply a clean '11v11' default template to ensure the field layout is cleared.
+    const teamFormations = formations.filter(f => f.teamId === currentProfile.teamId);
+    if (teamFormations.length === 0) {
+      setSelectedSystem('11v11');
+      setSelectedPresetIndex(0);
+      setFormationName('Tactical Lineup');
+      const defaultMap: Record<string, string | null> = {};
+      const targetPreset = PRESET_FORMATIONS['11v11']?.[0];
+      if (targetPreset) {
+        targetPreset.assignments.forEach(as => {
+          defaultMap[as.positionId] = null;
+        });
+      }
+      setLiveAssignments(defaultMap);
+    }
+  }, [currentProfile.teamId]);
 
   // Auto-load last saved team formation on mount or when formations list loads
   React.useEffect(() => {
@@ -462,14 +503,10 @@ export default function FormationsTab({
 
   const plDetails = playerAssignmentDetails();
 
-  // Helper dictionary mapping playerId to PlayerProfile object
-  const playersLookup = players.reduce((acc, p) => {
-    acc[p.id] = p;
-    return acc;
-  }, {} as Record<string, UserProfile>);
-
-  // List of players currently placement status in the template configuration
-  const placedPlayerIds = Object.values(liveAssignments).filter((id): id is string => id !== null);
+  // List of players currently placement status in the template configuration (only count players belonging to the active team)
+  const placedPlayerIds = Object.values(liveAssignments).filter((id): id is string => {
+    return id !== null && playersLookup[id]?.teamId === currentProfile.teamId;
+  });
   const unplacedPlayers = myTeamPlayers.filter(p => !placedPlayerIds.includes(p.id));
 
   return (
@@ -888,7 +925,8 @@ export default function FormationsTab({
                     style={{
                       left: `${as.x}%`,
                       bottom: `${as.y}%`,
-                      transform: 'translate(-50%, 50%)'
+                      transform: 'translate(-50%, 50%)',
+                      zIndex: isSelectedSlot ? 50 : 20
                     }}
                     className="absolute"
                   >

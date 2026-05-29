@@ -22,7 +22,9 @@ import {
   Building,
   Database,
   Wifi,
-  WifiOff
+  WifiOff,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { UserProfile, Coach, Team, UserRole } from '../types';
 
@@ -37,13 +39,14 @@ interface AuthScreenProps {
   onGoogleSignIn?: (
     role?: UserRole, 
     customName?: string, 
-    payload?: { coachId?: string; teamId?: string; associationName?: string }
+    payload?: { coachId?: string; teamId?: string; teamIds?: string[]; associationName?: string }
   ) => Promise<void>;
   onPlayerSignup: (fields: { 
     name: string; 
     email: string; 
     password?: string;
     coachId?: string; 
+    teamId?: string;
     staySignedIn: boolean; 
   }) => Promise<void>;
   onCoachSignup: (fields: { 
@@ -51,6 +54,7 @@ interface AuthScreenProps {
     email: string; 
     password?: string;
     teamId?: string; 
+    teamIds?: string[];
     staySignedIn: boolean; 
   }) => Promise<void>;
   onAssociationSignup: (fields: { 
@@ -67,6 +71,13 @@ interface AuthScreenProps {
     playerName: string;
     playerEmail: string;
     coachId?: string;
+    teamId?: string;
+    additionalChildren?: Array<{
+      playerName: string;
+      playerEmail: string;
+      coachId?: string;
+      teamId?: string;
+    }>;
     staySignedIn: boolean;
   }) => Promise<void>;
 }
@@ -99,9 +110,11 @@ export default function AuthScreen({
 
   // Player Signup Inputs
   const [playerCoachId, setPlayerCoachId] = useState('');
+  const [playerTeamId, setPlayerTeamId] = useState('');
 
   // Coach Signup Inputs
   const [coachTeamId, setCoachTeamId] = useState('');
+  const [coachTeamIds, setCoachTeamIds] = useState<string[]>([]);
 
   // Association Signup Inputs
   const [associationName, setAssociationName] = useState('');
@@ -111,6 +124,17 @@ export default function AuthScreen({
   const [parentPlayerEmail, setParentPlayerEmail] = useState('');
   const [parentAutoEmail, setParentAutoEmail] = useState(true);
   const [parentCoachId, setParentCoachId] = useState('');
+  const [parentTeamId, setParentTeamId] = useState('');
+
+  interface AdditionalChildInput {
+    id: string;
+    name: string;
+    email: string;
+    autoEmail: boolean;
+    coachId: string;
+    teamId: string;
+  }
+  const [additionalChildren, setAdditionalChildren] = useState<AdditionalChildInput[]>([]);
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,11 +187,25 @@ export default function AuthScreen({
     setLoading(true);
     try {
       if (selectedRole === 'player') {
+        const selectedCoachObj = playerCoachId ? coaches.find(c => c.id === playerCoachId) : null;
+        const coachTeamsList = selectedCoachObj 
+          ? (selectedCoachObj.teamIds && selectedCoachObj.teamIds.length > 0
+              ? teams.filter(t => selectedCoachObj.teamIds!.includes(t.id))
+              : teams.filter(t => t.id === selectedCoachObj.teamId))
+          : [];
+        
+        if (coachTeamsList.length >= 2 && !playerTeamId) {
+          setErrorMsg('Your Coach manages multiple teams. Please select your specific team.');
+          setLoading(false);
+          return;
+        }
+
         await onPlayerSignup({
           name,
           email: email.trim(),
           password,
           coachId: playerCoachId || undefined,
+          teamId: playerTeamId || undefined,
           staySignedIn
         });
       } else if (selectedRole === 'coach') {
@@ -175,7 +213,8 @@ export default function AuthScreen({
           name,
           email: email.trim(),
           password,
-          teamId: coachTeamId || undefined,
+          teamId: coachTeamIds[0] || undefined,
+          teamIds: coachTeamIds,
           staySignedIn
         });
       } else if (selectedRole === 'association') {
@@ -203,6 +242,19 @@ export default function AuthScreen({
           return;
         }
 
+        const selectedCoachObj = parentCoachId ? coaches.find(c => c.id === parentCoachId) : null;
+        const coachTeamsList = selectedCoachObj 
+          ? (selectedCoachObj.teamIds && selectedCoachObj.teamIds.length > 0
+              ? teams.filter(t => selectedCoachObj.teamIds!.includes(t.id))
+              : teams.filter(t => t.id === selectedCoachObj.teamId))
+          : [];
+
+        if (coachTeamsList.length >= 2 && !parentTeamId) {
+          setErrorMsg("Your athlete's Coach manages multiple teams. Please select their specific team.");
+          setLoading(false);
+          return;
+        }
+
         let resolvedPlayerEmail = parentPlayerEmail.trim();
         if (parentAutoEmail) {
           resolvedPlayerEmail = parentPlayerName.trim().toLowerCase().replace(/\s+/g, '-') + '@pdp.com';
@@ -212,6 +264,58 @@ export default function AuthScreen({
           return;
         }
 
+        // Validate each additional child
+        const mappedAdditional: Array<{
+          playerName: string;
+          playerEmail: string;
+          coachId?: string;
+          teamId?: string;
+        }> = [];
+
+        for (let i = 0; i < additionalChildren.length; i++) {
+          const ac = additionalChildren[i];
+          const indexLabel = `additional athlete #${i + 1}`;
+          if (!ac.name.trim()) {
+            setErrorMsg(`Please enter the full name for ${indexLabel}.`);
+            setLoading(false);
+            return;
+          }
+          if (!ac.coachId) {
+            setErrorMsg(`Please select a Coach for ${indexLabel} (${ac.name}).`);
+            setLoading(false);
+            return;
+          }
+
+          const acCoach = coaches.find(c => c.id === ac.coachId);
+          const acCoachTeams = acCoach 
+            ? (acCoach.teamIds && acCoach.teamIds.length > 0
+                ? teams.filter(t => acCoach.teamIds!.includes(t.id))
+                : teams.filter(t => t.id === acCoach.teamId))
+            : [];
+
+          if (acCoachTeams.length >= 2 && !ac.teamId) {
+            setErrorMsg(`${ac.name}'s Coach manages multiple squads. Please select their specific team.`);
+            setLoading(false);
+            return;
+          }
+
+          let acEmail = ac.email.trim();
+          if (ac.autoEmail) {
+            acEmail = ac.name.trim().toLowerCase().replace(/\s+/g, '-') + '@pdp.com';
+          } else if (!acEmail) {
+            setErrorMsg(`Please enter a custom email address or check the 'Auto-generate' option for ${ac.name}.`);
+            setLoading(false);
+            return;
+          }
+
+          mappedAdditional.push({
+            playerName: ac.name.trim(),
+            playerEmail: acEmail,
+            coachId: ac.coachId,
+            teamId: ac.teamId || undefined
+          });
+        }
+
         await onParentSignup({
           parentName: name,
           parentEmail: email.trim(),
@@ -219,6 +323,8 @@ export default function AuthScreen({
           playerName: parentPlayerName,
           playerEmail: resolvedPlayerEmail,
           coachId: parentCoachId || undefined,
+          teamId: parentTeamId || undefined,
+          additionalChildren: mappedAdditional,
           staySignedIn
         });
       }
@@ -241,12 +347,27 @@ export default function AuthScreen({
             setLoading(false);
             return;
           }
+          if (selectedRole === 'player') {
+            const selectedCoachObj = playerCoachId ? coaches.find(c => c.id === playerCoachId) : null;
+            const coachTeamsList = selectedCoachObj 
+              ? (selectedCoachObj.teamIds && selectedCoachObj.teamIds.length > 0
+                  ? teams.filter(t => selectedCoachObj.teamIds!.includes(t.id))
+                  : teams.filter(t => t.id === selectedCoachObj.teamId))
+              : [];
+            
+            if (coachTeamsList.length >= 2 && !playerTeamId) {
+              setErrorMsg('Your Coach manages multiple teams. Please select your specific team.');
+              setLoading(false);
+              return;
+            }
+          }
           await onGoogleSignIn(
             selectedRole,
             name || undefined,
             {
               coachId: selectedRole === 'player' ? playerCoachId || undefined : undefined,
-              teamId: selectedRole === 'coach' ? coachTeamId || undefined : undefined,
+              teamId: selectedRole === 'player' ? (playerTeamId || undefined) : (coachTeamIds[0] || undefined),
+              teamIds: selectedRole === 'coach' ? coachTeamIds : undefined,
               associationName: selectedRole === 'association' ? associationName || undefined : undefined,
             }
           );
@@ -352,43 +473,6 @@ export default function AuthScreen({
               <Users className="w-3.5 h-3.5" />
               Register Profile
             </button>
-          </div>
-
-          {/* Database Mode Switcher Indicator */}
-          <div className="flex items-center justify-between p-3.5 bg-slate-950/80 border border-slate-850 rounded-2xl">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className={`p-1.5 rounded-lg border shrink-0 ${
-                useFirestore 
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                  : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 animate-pulse'
-              }`}>
-                {useFirestore ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-              </div>
-              <div className="text-left min-w-0">
-                <div className="text-[11px] font-sans font-bold text-slate-200 truncate">
-                  {useFirestore ? 'Firebase Cloud Connected' : 'Offline Sandbox Active'}
-                </div>
-                <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mt-0.5 truncate">
-                  {useFirestore ? 'Enterprise Sync Engine Active' : 'Zero-Network Local Storage Mode'}
-                </div>
-              </div>
-            </div>
-            {onToggleFirestore && (
-              <button
-                type="button"
-                onClick={() => {
-                  onToggleFirestore(!useFirestore);
-                  setErrorMsg('');
-                }}
-                className={`px-3 py-1.5 rounded-lg text-[10px] uppercase font-mono tracking-wider font-bold border transition shrink-0 ${
-                  useFirestore 
-                    ? 'bg-indigo-950/40 text-indigo-400 border-indigo-850 hover:bg-indigo-900/40 hover:border-indigo-750' 
-                    : 'bg-emerald-950/40 text-emerald-400 border-emerald-850 hover:bg-emerald-900/40 hover:border-emerald-750'
-                }`}
-              >
-                {useFirestore ? 'Go Offline' : 'Go Online'}
-              </button>
-            )}
           </div>
 
           {/* Primary Interactive Form Wrapper */}
@@ -628,64 +712,121 @@ export default function AuthScreen({
                 </div>
 
                 {/* ROLE PATH 1: Player selection logic */}
-                {selectedRole === 'player' && (
-                  <div className="p-4 bg-slate-950 border border-slate-850 rounded-2xl space-y-3">
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-405 uppercase tracking-wider mb-1">
-                        SELECT YOUR COACH (auto-links Team & Organization)
-                      </label>
-                      <select
-                        value={playerCoachId}
-                        onChange={(e) => setPlayerCoachId(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-200 rounded-lg p-2.5 outline-none font-sans"
-                      >
-                        <option value="">-- No Coach selected (Sign up as Unlisted) --</option>
-                        {coaches.map(c => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} ({c.email})
-                          </option>
-                        ))}
-                      </select>
+                {selectedRole === 'player' && (() => {
+                  const selectedCoachObj = playerCoachId ? coaches.find(c => c.id === playerCoachId) : null;
+                  const coachTeamsList = selectedCoachObj 
+                    ? (selectedCoachObj.teamIds && selectedCoachObj.teamIds.length > 0
+                        ? teams.filter(t => selectedCoachObj.teamIds!.includes(t.id))
+                        : teams.filter(t => t.id === selectedCoachObj.teamId))
+                    : [];
+
+                  return (
+                    <div className="p-4 bg-slate-950 border border-slate-850 rounded-2xl space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-mono text-slate-405 uppercase tracking-wider mb-1">
+                          SELECT YOUR COACH (auto-links Team & Organization)
+                        </label>
+                        <select
+                          value={playerCoachId}
+                          onChange={(e) => {
+                            setPlayerCoachId(e.target.value);
+                            setPlayerTeamId(''); // Reset selected team on coach change
+                          }}
+                          className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-205 rounded-lg p-2.5 outline-none font-sans"
+                        >
+                          <option value="">-- No Coach selected (Sign up as Unlisted) --</option>
+                          {coaches.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} ({c.email})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {playerCoachId !== '' && coachTeamsList.length >= 2 && (
+                        <div className="mt-3">
+                          <label className="block text-[10px] font-mono text-slate-405 uppercase tracking-wider mb-1">
+                            SELECT YOUR SPECIFIC TEAM (Required)
+                          </label>
+                          <select
+                            value={playerTeamId}
+                            required
+                            onChange={(e) => setPlayerTeamId(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-205 rounded-lg p-2.5 outline-none font-sans"
+                          >
+                            <option value="">-- Choose your team --</option>
+                            {coachTeamsList.map(t => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {playerCoachId === '' ? (
+                        <p className="text-[11px] text-amber-400/80 italic font-medium leading-normal">
+                          * You don't have a coach on this system? No worries. You'll sign in as an <b>Unlisted Athlete</b> and can link/create later in profile settings!
+                        </p>
+                      ) : coachTeamsList.length >= 2 && !playerTeamId ? (
+                        <p className="text-[11px] text-amber-400/85 italic font-medium leading-normal animate-pulse">
+                          * Your coach manages multiple teams. Please select which team you are registering for above!
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-emerald-400/90 font-medium leading-normal font-sans">
+                          ✓ Excellent. Team affiliation and parent club information will populate automatically from your coach's registration details!
+                        </p>
+                      )}
                     </div>
-                    {playerCoachId === '' ? (
-                      <p className="text-[11px] text-amber-400/80 italic font-medium leading-normal">
-                        * You don't have a coach on this system? No worries. You'll sign in as an <b>Unlisted Athlete</b> and can link/create later in profile settings!
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-emerald-400/90 font-medium leading-normal">
-                        ✓ Excellent. Team affiliation and parent club information will populate automatically from your coach's registration details!
-                      </p>
-                    )}
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* ROLE PATH 2: Coach selection logic */}
                 {selectedRole === 'coach' && (
                   <div className="p-4 bg-slate-950 border border-slate-850 rounded-2xl space-y-3">
                     <div>
-                      <label className="block text-[10px] font-mono text-slate-405 uppercase tracking-wider mb-1">
-                        SELECT ASSIGNED TEAM
+                      <label className="block text-[10px] font-mono text-slate-405 uppercase tracking-wider mb-2">
+                        SELECT ASSIGNED TEAMS (You can select multiple!)
                       </label>
-                      <select
-                        value={coachTeamId}
-                        onChange={(e) => setCoachTeamId(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-200 rounded-lg p-2.5 outline-none font-sans"
-                      >
-                        <option value="">-- My team is not listed (I will formulate it inside) --</option>
-                        {teams.map(t => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="max-h-48 overflow-y-auto border border-slate-800 rounded-xl bg-slate-900 p-2.5 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-850 scrollbar-track-transparent">
+                        {teams.length === 0 ? (
+                          <div className="text-slate-500 text-xs italic p-2">No teams available in the system yet.</div>
+                        ) : (
+                          teams.map(t => {
+                            const isChecked = coachTeamIds.includes(t.id);
+                            return (
+                              <label key={t.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/60 cursor-pointer transition select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (isChecked) {
+                                      setCoachTeamIds(prev => prev.filter(id => id !== t.id));
+                                    } else {
+                                      setCoachTeamIds(prev => [...prev, t.id]);
+                                    }
+                                  }}
+                                  className="rounded border-slate-700 bg-slate-950 text-indigo-550 focus:ring-opacity-40 h-4 w-4"
+                                />
+                                <span className="text-xs text-slate-205 font-medium font-sans">
+                                  {t.name}
+                                </span>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                      <p className="text-[9px] font-mono text-slate-505 mt-1 uppercase tracking-wider">
+                        {coachTeamIds.length} team(s) selected
+                      </p>
                     </div>
-                    {coachTeamId === '' ? (
+                    {coachTeamIds.length === 0 ? (
                       <p className="text-[11px] text-amber-400/80 italic font-medium leading-normal">
                         * No worries if your team is not listed. Upon entering the app, we will guide you to <b>Formulate a new Team, create or select a Club, and integrate your Governing Association</b> instantly!
                       </p>
                     ) : (
-                      <p className="text-[11px] text-emerald-400/90 font-medium leading-normal">
-                        ✓ Your coach credentials will instantly bind to this competitive soccer/basketball squad roster!
+                      <p className="text-[11px] text-emerald-400/90 font-medium leading-normal font-sans">
+                        ✓ Your coach credentials will instantly bind to your selected roster squad(s) or competitive teams.
                       </p>
                     )}
                   </div>
@@ -714,89 +855,294 @@ export default function AuthScreen({
                 )}
 
                 {/* ROLE PATH 4: Parent registration logic */}
-                {selectedRole === 'parent' && (
-                  <div className="p-4 bg-slate-950 border border-slate-850 rounded-2xl space-y-4">
-                    <span className="text-[10px] uppercase font-mono text-[#00BBFF] tracking-wider block font-bold">
-                      Youth Athlete Profile Linkage
-                    </span>
+                {selectedRole === 'parent' && (() => {
+                  const selectedCoachObj = parentCoachId ? coaches.find(c => c.id === parentCoachId) : null;
+                  const coachTeamsList = selectedCoachObj 
+                    ? (selectedCoachObj.teamIds && selectedCoachObj.teamIds.length > 0
+                        ? teams.filter(t => selectedCoachObj.teamIds!.includes(t.id))
+                        : teams.filter(t => t.id === selectedCoachObj.teamId))
+                    : [];
 
-                    {/* Athlete Name */}
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
-                        ATHLETE'S FULL NAME
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Alex Rivera"
-                        value={parentPlayerName}
-                        onChange={(e) => setParentPlayerName(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-150 outline-none font-sans"
-                      />
-                    </div>
+                  return (
+                    <div className="p-4 bg-slate-950 border border-slate-850 rounded-2xl space-y-4">
+                      <span className="text-[10px] uppercase font-mono text-[#00BBFF] tracking-wider block font-bold">
+                        Primary Athlete Profile Linkage
+                      </span>
 
-                    {/* Auto generated toggle */}
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                      {/* Athlete Name */}
+                      <div>
+                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                          ATHLETE'S FULL NAME
+                        </label>
                         <input
-                          type="checkbox"
-                          checked={parentAutoEmail}
-                          onChange={(e) => setParentAutoEmail(e.target.checked)}
-                          className="rounded border-[#00BBFF] text-[#00BBFF] bg-slate-900 focus:ring-0 focus:ring-offset-0 h-4 w-4 cursor-pointer"
+                          type="text"
+                          required
+                          placeholder="e.g. Alex Rivera"
+                          value={parentPlayerName}
+                          onChange={(e) => setParentPlayerName(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-150 outline-none font-sans"
                         />
-                        <span className="text-xs text-slate-350">Auto-generate professional player email (@pdp.com)</span>
-                      </label>
+                      </div>
 
-                      {parentAutoEmail ? (
-                        <div className="bg-slate-900/60 p-2 border border-slate-800 rounded-lg">
-                          <p className="text-[10px] text-slate-500 font-mono">Auto Email Broadcast Address:</p>
-                          <p className="text-xs text-emerald-400 font-mono font-bold truncate mt-0.5">
-                            {parentPlayerName 
-                              ? `${parentPlayerName.trim().toLowerCase().replace(/\s+/g, '-')}@pdp.com` 
-                              : '[athletes-name]@pdp.com'}
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
-                            ATHLETE'S CUSTOM EMAIL ADDRESS
-                          </label>
+                      {/* Auto generated toggle */}
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
                           <input
-                            type="email"
-                            required={!parentAutoEmail}
-                            placeholder="e.g. alexrivera@gmail.com"
-                            value={parentPlayerEmail}
-                            onChange={(e) => setParentPlayerEmail(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-150 outline-none font-sans"
+                            type="checkbox"
+                            checked={parentAutoEmail}
+                            onChange={(e) => setParentAutoEmail(e.target.checked)}
+                            className="rounded border-[#00BBFF] text-[#00BBFF] bg-slate-900 focus:ring-0 focus:ring-offset-0 h-4 w-4 cursor-pointer"
                           />
+                          <span className="text-xs text-slate-350">Auto-generate professional player email (@pdp.com)</span>
+                        </label>
+
+                        {parentAutoEmail ? (
+                          <div className="bg-slate-900/60 p-2 border border-slate-800 rounded-lg">
+                            <p className="text-[10px] text-slate-500 font-mono">Auto Email Broadcast Address:</p>
+                            <p className="text-xs text-emerald-400 font-mono font-bold truncate mt-0.5">
+                              {parentPlayerName 
+                                ? `${parentPlayerName.trim().toLowerCase().replace(/\s+/g, '-')}@pdp.com` 
+                                : '[athletes-name]@pdp.com'}
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                              ATHLETE'S CUSTOM EMAIL ADDRESS
+                            </label>
+                            <input
+                              type="email"
+                              required={!parentAutoEmail}
+                              placeholder="e.g. alexrivera@gmail.com"
+                              value={parentPlayerEmail}
+                              onChange={(e) => setParentPlayerEmail(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-150 outline-none font-sans"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Select Coach */}
+                      <div>
+                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                          SELECT SQUAD COACH
+                        </label>
+                        <select
+                          value={parentCoachId}
+                          onChange={(e) => {
+                            setParentCoachId(e.target.value);
+                            setParentTeamId(''); // Reset selected team on coach change
+                          }}
+                          className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-205 rounded-lg p-2.5 outline-none font-sans"
+                        >
+                          <option value="">-- Click to select Team Coach --</option>
+                          {coaches.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} ({c.email})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Select Squad Team */}
+                      {parentCoachId !== '' && coachTeamsList.length > 0 && (
+                        <div>
+                          <label className="block text-[10px] font-mono text-[#00BBFF] uppercase mb-1 font-bold">
+                            SELECT ATHLETE'S SPECIFIC TEAM {coachTeamsList.length >= 2 ? '(Required)' : '(Recommended)'}
+                          </label>
+                          <select
+                            value={parentTeamId}
+                            onChange={(e) => setParentTeamId(e.target.value)}
+                            className="w-full bg-slate-900 border border-[#00BBFF]/40 text-xs text-slate-200 rounded-lg p-2.5 outline-none font-sans focus:border-[#00BBFF] transition"
+                          >
+                            <option value="">-- Select Child's Assigned Squad --</option>
+                            {coachTeamsList.map(t => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                          {coachTeamsList.length >= 2 && !parentTeamId && (
+                            <p className="text-[10px] text-amber-400 mt-1 italic">
+                              * This coach manages multiple squads. Please choose the precise team your child plays for.
+                            </p>
+                          )}
                         </div>
                       )}
-                    </div>
 
-                    {/* Select Coach */}
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
-                        SELECT SQUAD COACH
-                      </label>
-                      <select
-                        value={parentCoachId}
-                        onChange={(e) => setParentCoachId(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-200 rounded-lg p-2.5 outline-none font-sans"
+                      {/* Dynamic Additional Children List */}
+                      {additionalChildren.length > 0 && (
+                        <div className="space-y-4 pt-4 border-t border-slate-800">
+                          <span className="text-[10px] uppercase font-mono text-[#00BBFF] tracking-wider block font-bold">
+                            Additional Athlete Profiles
+                          </span>
+                          
+                          {additionalChildren.map((ac, idx) => {
+                            const acCoachObj = ac.coachId ? coaches.find(c => c.id === ac.coachId) : null;
+                            const acCoachTeams = acCoachObj
+                              ? (acCoachObj.teamIds && acCoachObj.teamIds.length > 0
+                                  ? teams.filter(t => acCoachObj.teamIds!.includes(t.id))
+                                  : teams.filter(t => t.id === acCoachObj.teamId))
+                              : [];
+
+                            return (
+                              <div key={ac.id} className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-3 relative">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAdditionalChildren(prev => prev.filter(item => item.id !== ac.id));
+                                  }}
+                                  className="absolute top-2.5 right-2 text-rose-500 hover:text-rose-400 p-1.5 hover:bg-rose-500/10 rounded-lg transition"
+                                  title="Remove Athlete"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+
+                                <div className="text-[9px] font-mono text-slate-500 font-bold uppercase tracking-wider">
+                                  ATHLETE LINK #{idx + 2}
+                                </div>
+
+                                {/* Athlete Name */}
+                                <div>
+                                  <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                                    ATHLETE'S FULL NAME
+                                  </label>
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. Sofia Rivera"
+                                    value={ac.name}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setAdditionalChildren(prev => prev.map(item => item.id === ac.id ? { ...item, name: val } : item));
+                                    }}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-150 outline-none font-sans focus:border-[#00BBFF]/30"
+                                  />
+                                </div>
+
+                                {/* Auto-generate email checkbox or custom email input */}
+                                <div className="space-y-2">
+                                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={ac.autoEmail}
+                                      onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setAdditionalChildren(prev => prev.map(item => item.id === ac.id ? { ...item, autoEmail: checked } : item));
+                                      }}
+                                      className="rounded border-[#00BBFF] text-[#00BBFF] bg-slate-950 focus:ring-0 focus:ring-offset-0 h-4 w-4 cursor-pointer"
+                                    />
+                                    <span className="text-xs text-slate-350">Auto-generate professional player email (@pdp.com)</span>
+                                  </label>
+
+                                  {ac.autoEmail ? (
+                                    <div className="bg-slate-950/60 p-2 border border-slate-800 rounded-lg">
+                                      <p className="text-[10px] text-slate-500 font-mono">Auto Email Broadcast Address:</p>
+                                      <p className="text-xs text-emerald-400 font-mono font-bold truncate mt-0.5">
+                                        {ac.name 
+                                          ? `${ac.name.trim().toLowerCase().replace(/\s+/g, '-')}@pdp.com` 
+                                          : '[athletes-name]@pdp.com'}
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                                        ATHLETE'S CUSTOM EMAIL ADDRESS
+                                      </label>
+                                      <input
+                                        type="email"
+                                        required={!ac.autoEmail}
+                                        placeholder="e.g. sofia@gmail.com"
+                                        value={ac.email}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setAdditionalChildren(prev => prev.map(item => item.id === ac.id ? { ...item, email: val } : item));
+                                        }}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-150 outline-none font-sans focus:border-[#00BBFF]/30"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Select Coach */}
+                                <div>
+                                  <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                                    SELECT SQUAD COACH
+                                  </label>
+                                  <select
+                                    value={ac.coachId}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setAdditionalChildren(prev => prev.map(item => item.id === ac.id ? { ...item, coachId: val, teamId: '' } : item));
+                                    }}
+                                    className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-205 rounded-lg p-2.5 outline-none font-sans"
+                                  >
+                                    <option value="">-- Click to select Team Coach --</option>
+                                    {coaches.map(c => (
+                                      <option key={c.id} value={c.id}>
+                                        {c.name} ({c.email})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                {/* Select Team */}
+                                {ac.coachId !== '' && acCoachTeams.length > 0 && (
+                                  <div>
+                                    <label className="block text-[10px] font-mono text-[#00BBFF] uppercase mb-1 font-bold">
+                                      SELECT ATHLETE'S SPECIFIC TEAM {acCoachTeams.length >= 2 ? '(Required)' : '(Recommended)'}
+                                    </label>
+                                    <select
+                                      value={ac.teamId}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setAdditionalChildren(prev => prev.map(item => item.id === ac.id ? { ...item, teamId: val } : item));
+                                      }}
+                                      className="w-full bg-slate-950 border border-[#00BBFF]/40 text-xs text-slate-200 rounded-lg p-2.5 outline-none font-sans focus:border-[#00BBFF] transition"
+                                    >
+                                      <option value="">-- Select Child's Assigned Squad --</option>
+                                      {acCoachTeams.map(t => (
+                                        <option key={t.id} value={t.id}>
+                                          {t.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Add Child Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAdditionalChildren(prev => [
+                            ...prev,
+                            {
+                              id: `addchild-${Date.now()}-${prev.length}`,
+                              name: '',
+                              email: '',
+                              autoEmail: true,
+                              coachId: '',
+                              teamId: ''
+                            }
+                          ]);
+                        }}
+                        className="w-full py-2.5 px-3 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 font-bold hover:text-slate-150 text-xs rounded-xl transition duration-150 flex items-center justify-center gap-1.5 shadow-sm"
                       >
-                        <option value="">-- Click to select Team Coach --</option>
-                        {coaches.map(c => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} ({c.email})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                        <Plus className="h-4 w-4 text-[#00BBFF]" />
+                        <span>Link Another Child / Athlete Profile</span>
+                      </button>
 
-                    <p className="text-[11px] text-slate-450 leading-relaxed font-sans">
-                      This will instantly allocate account authorization profiles for both yourself and your player on the performance registry, bound to the specified squad roster.
-                    </p>
-                  </div>
-                )}
+                      <p className="text-[11px] text-slate-450 leading-relaxed font-sans pt-1">
+                        This will instantly allocate account authorization profiles for yourself and all linked players on the performance registry, bound to their specified squad rosters.
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 {/* Stay signed in checkbox */}
                 <div className="flex items-center pt-2">

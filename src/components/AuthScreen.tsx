@@ -19,7 +19,10 @@ import {
   HelpCircle,
   Clock,
   Unlock,
-  Building
+  Building,
+  Database,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { UserProfile, Coach, Team, UserRole } from '../types';
 
@@ -27,6 +30,8 @@ interface AuthScreenProps {
   users: UserProfile[];
   coaches: Coach[];
   teams: Team[];
+  useFirestore?: boolean;
+  onToggleFirestore?: (val: boolean) => void;
   onLogin: (profile: UserProfile, staySignedIn: boolean) => void;
   onLoginCredentials?: (email: string, password: string, staySignedIn: boolean) => Promise<void>;
   onGoogleSignIn?: (
@@ -55,18 +60,30 @@ interface AuthScreenProps {
     associationName: string; 
     staySignedIn: boolean; 
   }) => Promise<void>;
+  onParentSignup: (fields: {
+    parentName: string;
+    parentEmail: string;
+    parentPassword?: string;
+    playerName: string;
+    playerEmail: string;
+    coachId?: string;
+    staySignedIn: boolean;
+  }) => Promise<void>;
 }
 
 export default function AuthScreen({
   users,
   coaches,
   teams,
+  useFirestore = true,
+  onToggleFirestore,
   onLogin,
   onLoginCredentials,
   onGoogleSignIn,
   onPlayerSignup,
   onCoachSignup,
-  onAssociationSignup
+  onAssociationSignup,
+  onParentSignup
 }: AuthScreenProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [staySignedIn, setStaySignedIn] = useState(true);
@@ -88,6 +105,12 @@ export default function AuthScreen({
 
   // Association Signup Inputs
   const [associationName, setAssociationName] = useState('');
+
+  // Parent Signup Inputs
+  const [parentPlayerName, setParentPlayerName] = useState('');
+  const [parentPlayerEmail, setParentPlayerEmail] = useState('');
+  const [parentAutoEmail, setParentAutoEmail] = useState(true);
+  const [parentCoachId, setParentCoachId] = useState('');
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,6 +191,36 @@ export default function AuthScreen({
           associationName,
           staySignedIn
         });
+      } else if (selectedRole === 'parent') {
+        if (!parentPlayerName) {
+          setErrorMsg("Please enter your athlete's full name.");
+          setLoading(false);
+          return;
+        }
+        if (!parentCoachId) {
+          setErrorMsg("Please select a Coach to connect your youth athlete to.");
+          setLoading(false);
+          return;
+        }
+
+        let resolvedPlayerEmail = parentPlayerEmail.trim();
+        if (parentAutoEmail) {
+          resolvedPlayerEmail = parentPlayerName.trim().toLowerCase().replace(/\s+/g, '-') + '@pdp.com';
+        } else if (!resolvedPlayerEmail) {
+          setErrorMsg("Please provide your athlete's email address or check the 'Auto-generate' option.");
+          setLoading(false);
+          return;
+        }
+
+        await onParentSignup({
+          parentName: name,
+          parentEmail: email.trim(),
+          parentPassword: password,
+          playerName: parentPlayerName,
+          playerEmail: resolvedPlayerEmail,
+          coachId: parentCoachId || undefined,
+          staySignedIn
+        });
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to register account credentials.');
@@ -220,7 +273,7 @@ export default function AuthScreen({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <img 
-              src="https://i.ibb.co/GfHgRPwT/Untitled-design-5.png" 
+              src="https://i.ibb.co/gb9535YK/Untitled-design-6.png" 
               alt="Echelon Logo" 
               className="h-10 w-10 object-contain rounded-xl"
               referrerPolicy="no-referrer"
@@ -301,12 +354,68 @@ export default function AuthScreen({
             </button>
           </div>
 
+          {/* Database Mode Switcher Indicator */}
+          <div className="flex items-center justify-between p-3.5 bg-slate-950/80 border border-slate-850 rounded-2xl">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className={`p-1.5 rounded-lg border shrink-0 ${
+                useFirestore 
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                  : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 animate-pulse'
+              }`}>
+                {useFirestore ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+              </div>
+              <div className="text-left min-w-0">
+                <div className="text-[11px] font-sans font-bold text-slate-200 truncate">
+                  {useFirestore ? 'Firebase Cloud Connected' : 'Offline Sandbox Active'}
+                </div>
+                <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mt-0.5 truncate">
+                  {useFirestore ? 'Enterprise Sync Engine Active' : 'Zero-Network Local Storage Mode'}
+                </div>
+              </div>
+            </div>
+            {onToggleFirestore && (
+              <button
+                type="button"
+                onClick={() => {
+                  onToggleFirestore(!useFirestore);
+                  setErrorMsg('');
+                }}
+                className={`px-3 py-1.5 rounded-lg text-[10px] uppercase font-mono tracking-wider font-bold border transition shrink-0 ${
+                  useFirestore 
+                    ? 'bg-indigo-950/40 text-indigo-400 border-indigo-850 hover:bg-indigo-900/40 hover:border-indigo-750' 
+                    : 'bg-emerald-950/40 text-emerald-400 border-emerald-850 hover:bg-emerald-900/40 hover:border-emerald-750'
+                }`}
+              >
+                {useFirestore ? 'Go Offline' : 'Go Online'}
+              </button>
+            )}
+          </div>
+
           {/* Primary Interactive Form Wrapper */}
           <div className="flex-1 flex flex-col justify-center py-4">
             
             {errorMsg && (
-              <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-mono">
-                ⚠ {errorMsg}
+              <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs space-y-3">
+                <div className="font-mono font-bold flex items-center gap-1.5">
+                  <span className="text-sm">⚠</span> {errorMsg.toLowerCase().includes('network') || errorMsg.toLowerCase().includes('failed') || errorMsg.toLowerCase().includes('fetch') ? 'Database Network Fault' : 'Verification Alert'}
+                </div>
+                <p className="text-slate-300 leading-relaxed text-[11px]">
+                  {errorMsg.toLowerCase().includes('network') || errorMsg.toLowerCase().includes('failed') || errorMsg.toLowerCase().includes('fetch')
+                    ? "Your local development or network container sandbox is shielding external requests, blocking contact with Google Identity servers (auth/network-request-failed). You can completely work around this by going into 'Offline Sandbox' mode above, and complete all signups locally in-browser!"
+                    : errorMsg}
+                </p>
+                {(errorMsg.toLowerCase().includes('network') || errorMsg.toLowerCase().includes('failed') || errorMsg.toLowerCase().includes('fetch') || errorMsg.toLowerCase().includes('firebase')) && onToggleFirestore && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onToggleFirestore(false);
+                      setErrorMsg('');
+                    }}
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer text-center block uppercase tracking-wider font-mono animate-pulse"
+                  >
+                    Bypass to Local Offline Sandbox Mode
+                  </button>
+                )}
               </div>
             )}
 
@@ -414,7 +523,7 @@ export default function AuthScreen({
                 {/* Role Selector Grid */}
                 <div>
                   <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2">My Sporting Level / Role</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <button
                       type="button"
                       onClick={() => { setSelectedRole('player'); setErrorMsg(''); }}
@@ -451,28 +560,44 @@ export default function AuthScreen({
                       <Landmark className="h-4 w-4" />
                       <span>Association</span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedRole('parent'); setErrorMsg(''); }}
+                      className={`py-3 px-2 rounded-xl text-xs font-bold font-sans border transition-all flex flex-col items-center justify-center gap-1.5 ${
+                        selectedRole === 'parent'
+                          ? 'bg-[#1d75ff]/15 text-[#1d75ff] border-[#1d75ff]/30 shadow-sm shadow-[#1d75ff]/10'
+                          : 'bg-slate-950/60 border-slate-850 hover:border-slate-800 text-slate-400'
+                      }`}
+                    >
+                      <Users className="h-4 w-4 text-indigo-400" />
+                      <span>Parent</span>
+                    </button>
                   </div>
                 </div>
 
                 {/* General Fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   <div>
-                    <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-1">YOUR FULL NAME</label>
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-1">
+                      {selectedRole === 'parent' ? 'PARENT FULL NAME' : 'YOUR FULL NAME'}
+                    </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Alex Rivera"
+                      placeholder={selectedRole === 'parent' ? "e.g. Maria Rivera" : "e.g. Alex Rivera"}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 placeholder:text-slate-700 outline-none focus:border-[#00BBFF] focus:ring-1 focus:ring-[#00BBFF] transition-colors"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-1">EMAIL ADDRESS</label>
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-1">
+                      {selectedRole === 'parent' ? 'PARENT EMAIL ADDRESS' : 'EMAIL ADDRESS'}
+                    </label>
                     <input
                       type="email"
                       required
-                      placeholder="e.g. arivera@gmail.com"
+                      placeholder={selectedRole === 'parent' ? "e.g. mrivera@gmail.com" : "e.g. arivera@gmail.com"}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 placeholder:text-slate-700 outline-none focus:border-[#00BBFF] focus:ring-1 focus:ring-[#00BBFF] transition-colors"
@@ -584,6 +709,91 @@ export default function AuthScreen({
                     </div>
                     <p className="text-[11px] text-slate-400 leading-normal">
                       As an Association President/Manager account, you will have first-class privileges to <b>Register Clubs, delegate Teams, and verified Coaches</b> inside your corporate governance dashboard.
+                    </p>
+                  </div>
+                )}
+
+                {/* ROLE PATH 4: Parent registration logic */}
+                {selectedRole === 'parent' && (
+                  <div className="p-4 bg-slate-950 border border-slate-850 rounded-2xl space-y-4">
+                    <span className="text-[10px] uppercase font-mono text-[#00BBFF] tracking-wider block font-bold">
+                      Youth Athlete Profile Linkage
+                    </span>
+
+                    {/* Athlete Name */}
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                        ATHLETE'S FULL NAME
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Alex Rivera"
+                        value={parentPlayerName}
+                        onChange={(e) => setParentPlayerName(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-150 outline-none font-sans"
+                      />
+                    </div>
+
+                    {/* Auto generated toggle */}
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={parentAutoEmail}
+                          onChange={(e) => setParentAutoEmail(e.target.checked)}
+                          className="rounded border-[#00BBFF] text-[#00BBFF] bg-slate-900 focus:ring-0 focus:ring-offset-0 h-4 w-4 cursor-pointer"
+                        />
+                        <span className="text-xs text-slate-350">Auto-generate professional player email (@pdp.com)</span>
+                      </label>
+
+                      {parentAutoEmail ? (
+                        <div className="bg-slate-900/60 p-2 border border-slate-800 rounded-lg">
+                          <p className="text-[10px] text-slate-500 font-mono">Auto Email Broadcast Address:</p>
+                          <p className="text-xs text-emerald-400 font-mono font-bold truncate mt-0.5">
+                            {parentPlayerName 
+                              ? `${parentPlayerName.trim().toLowerCase().replace(/\s+/g, '-')}@pdp.com` 
+                              : '[athletes-name]@pdp.com'}
+                          </p>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                            ATHLETE'S CUSTOM EMAIL ADDRESS
+                          </label>
+                          <input
+                            type="email"
+                            required={!parentAutoEmail}
+                            placeholder="e.g. alexrivera@gmail.com"
+                            value={parentPlayerEmail}
+                            onChange={(e) => setParentPlayerEmail(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-150 outline-none font-sans"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Select Coach */}
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                        SELECT SQUAD COACH
+                      </label>
+                      <select
+                        value={parentCoachId}
+                        onChange={(e) => setParentCoachId(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 text-xs text-slate-200 rounded-lg p-2.5 outline-none font-sans"
+                      >
+                        <option value="">-- Click to select Team Coach --</option>
+                        {coaches.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.email})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <p className="text-[11px] text-slate-450 leading-relaxed font-sans">
+                      This will instantly allocate account authorization profiles for both yourself and your player on the performance registry, bound to the specified squad roster.
                     </p>
                   </div>
                 )}

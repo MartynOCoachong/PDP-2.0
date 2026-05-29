@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type UserRole = 'admin' | 'association' | 'club' | 'team' | 'coach' | 'player';
+export type UserRole = 'admin' | 'association' | 'club' | 'team' | 'coach' | 'player' | 'parent';
 
 export interface UserProfile {
   id: string;
@@ -17,6 +17,8 @@ export interface UserProfile {
   manualCoachName?: string; // If player inputs coach that is not on the app
   manualCoachEmail?: string; // email of manual coach
   approved: boolean;      // Admins approve new associations, clubs, teams, coaches profiles
+  childPlayerId?: string; // If parent, links to their child player's user ID
+  parentUserId?: string;  // If player, links to their parent's user ID
 }
 
 export interface Association {
@@ -177,4 +179,24 @@ export interface OrgProfileRequest {
   parentOrgId?: string; // Linked parent associationId for clubs, clubId for teams, teamId for coaches
   createdAt: string;
   status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface FormationAssignment {
+  positionId: string; // e.g. "GK", "LD"
+  positionName: string; // e.g. "Goalkeeper", "Left Defender"
+  playerId: string | null; // ID of the player assigned, or null
+  x: number; // 0 to 100 percentage layout
+  y: number; // 0 to 100 percentage layout
+}
+
+export interface TeamFormation {
+  id: string;
+  coachId: string;
+  teamId: string;
+  name: string; // e.g. "Weekly Match lineup"
+  system: '5v5' | '6v6' | '7v7' | '9v9' | '11v11';
+  lineupName: string; // e.g. "4-4-2", "2-3-1"
+  assignments: FormationAssignment[];
+  notes?: string;
+  updatedAt: string; // ISO string 
 }

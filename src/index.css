@@ -159,4 +159,73 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-
   border-color: #00bbff !important;
 }
 
+/* -------------------------------------------------------------------------
+   TACTICAL FIELD CANVAS DESIGN-PRESERVATION PRECISE OVERRIDES
+   ------------------------------------------------------------------------- */
+/* Prevent general svg properties from forcing solid blue stroke styles on tactical field paths/shapes */
+.pitch-canvas-container svg .field-marking-rect,
+.pitch-canvas-container svg .field-marking-circle {
+  stroke: rgba(255, 255, 255, 0.5) !important;
+  fill: none !important;
+}
+
+.pitch-canvas-container svg .field-marking-line,
+.pitch-canvas-container svg .field-marking-path {
+  stroke: rgba(255, 255, 255, 0.5) !important;
+  fill: none !important;
+}
+
+/* Override tactical arrow and line styling to use the custom defined color property */
+.pitch-canvas-container svg .tactical-line {
+  stroke: var(--line-color, #fbbf24) !important;
+  fill: none !important;
+}
+
+/* Ensure invisible drag hotspots for players are genuinely transparent with zero stroke outline */
+.pitch-canvas-container svg .player-hotspot {
+  stroke: none !important;
+  stroke-width: 0 !important;
+  fill: transparent !important;
+}
+
+/* Selected player selection indicator ring: default to amber dashed lines */
+.pitch-canvas-container svg .player-selection-ring {
+  stroke: #fbbf24 !important;
+  fill: none !important;
+  stroke-width: 0.8 !important;
+}
+
+/* Gameball outline ring */
+.pitch-canvas-container svg .ball-glow-ring {
+  stroke: #eab308 !important;
+  fill: none !important;
+  stroke-width: 0.5 !important;
+}
+
+/* Soccer ball visual elements overrides */
+.pitch-canvas-container svg .ball-shadow {
+  stroke: none !important;
+  stroke-width: 0 !important;
+  fill: rgba(0,0,0,0.3) !important;
+}
+
+.pitch-canvas-container svg .ball-body {
+  stroke: var(--ball-stroke-color, #fbbf24) !important;
+  fill: #ffffff !important;
+}
+
+.pitch-canvas-container svg .ball-marking {
+  stroke: none !important;
+  stroke-width: 0 !important;
+  fill: #334155 !important;
+}
+
+/* Drag handling endpoints for visual playbook lines */
+.pitch-canvas-container svg .endpoint-grab-circle {
+  stroke: #00bbff !important;
+  stroke-width: 0.5 !important;
+  fill: var(--endpoint-fill, #1e293b) !important;
+}
+
+
 

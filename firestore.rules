@@ -62,13 +62,16 @@ service cloud.firestore {
                data.role == 'club' || 
                data.role == 'team' || 
                data.role == 'coach' || 
-               data.role == 'player'
+               data.role == 'player' ||
+               data.role == 'parent'
              ) &&
              data.approved is bool &&
              (!('associationId' in data) || (data.associationId is string && data.associationId.size() <= 128)) &&
              (!('clubId' in data) || (data.clubId is string && data.clubId.size() <= 128)) &&
              (!('teamId' in data) || (data.teamId is string && data.teamId.size() <= 128)) &&
              (!('coachId' in data) || (data.coachId is string && data.coachId.size() <= 128)) &&
+             (!('childPlayerId' in data) || (data.childPlayerId is string && data.childPlayerId.size() <= 128)) &&
+             (!('parentUserId' in data) || (data.parentUserId is string && data.parentUserId.size() <= 128)) &&
              (!('manualCoachName' in data) || (data.manualCoachName is string && data.manualCoachName.size() <= 200)) &&
              (!('manualCoachEmail' in data) || (data.manualCoachEmail is string && data.manualCoachEmail.size() <= 200));
     }
@@ -179,6 +182,47 @@ service cloud.firestore {
              data.completedByPlayerIds is list;
     }
 
+    function isValidTeamFormation(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.coachId is string && data.coachId.size() <= 128 &&
+             data.teamId is string && data.teamId.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.system is string && (
+               data.system == "5v5" || 
+               data.system == "6v6" || 
+               data.system == "7v7" || 
+               data.system == "9v9" || 
+               data.system == "11v11"
+             ) &&
+             data.lineupName is string && data.lineupName.size() <= 100 &&
+             data.assignments is list &&
+             data.updatedAt is string && data.updatedAt.size() <= 100 &&
+             (!("notes" in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    function isValidTacticalPlaybook(data) {
+      return data.coachId is string && data.coachId.size() <= 128 &&
+             data.coachName is string && data.coachName.size() <= 200 &&
+             data.teamId is string && data.teamId.size() <= 128 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.description is string && data.description.size() <= 2000 &&
+             data.difficulty is string && (
+               data.difficulty == "Beginner" || 
+               data.difficulty == "Intermediate" || 
+               data.difficulty == "Advanced"
+             ) &&
+             data.fieldRatio is string && (
+               data.fieldRatio == "third" || 
+               data.fieldRatio == "half" || 
+               data.fieldRatio == "full"
+             ) &&
+             data.playbackSpeed is number &&
+             data.isAssigned is bool &&
+             data.frames is list &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100)) &&
+             (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 100));
+    }
+
     // --- COLLECTION RULES MAPPING ---
 
     // 1. Users Collection
@@ -187,7 +231,9 @@ service cloud.firestore {
       allow create, update: if isSignedIn() && isValidId(userId) && (
         isAdmin() || 
         // Allow a user to create/manage their own profile matching their auth UID
-        (request.auth.uid == userId && isValidUserProfile(incoming()))
+        (request.auth.uid == userId && isValidUserProfile(incoming())) ||
+        // Allow a parent to create/manage their linked child player profile
+        (isValidUserProfile(incoming()) && incoming().role == 'player' && 'parentUserId' in incoming() && incoming().parentUserId == request.auth.uid)
       );
       allow delete: if isAdmin();
     }
@@ -240,7 +286,11 @@ service cloud.firestore {
     match /dailyMetrics/{metricId} {
       allow read: if true;
       allow create, update: if isSignedIn() && isValidId(metricId) && isValidDailyMetrics(incoming()) && (
-        isAdmin() || incoming().playerId == request.auth.uid
+        isAdmin() || 
+        incoming().playerId == request.auth.uid ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'parent' &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.childPlayerId == incoming().playerId)
       );
       allow delete: if isAdmin() || (isSignedIn() && existing().playerId == request.auth.uid);
     }
@@ -268,6 +318,32 @@ service cloud.firestore {
         getUserRole(request.auth.uid) == 'coach' || 
         isAssociation() ||
         (getUserRole(request.auth.uid) == 'player' && isValidAssignment(incoming()))
+      );
+    }
+
+    // 11. Team Formations Collection
+    match /teamFormations/{formationId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(formationId) && (
+        isAdmin() || 
+        getUserRole(request.auth.uid) == 'coach'
+      ) && isValidTeamFormation(incoming());
+      allow delete: if isSignedIn() && (
+        isAdmin() || 
+        getUserRole(request.auth.uid) == 'coach'
+      );
+    }
+
+    // 12. Tactical Playbooks Collection
+    match /tactical_playbooks/{playbookId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidId(playbookId) && (
+        isAdmin() || 
+        getUserRole(request.auth.uid) == 'coach'
+      ) && isValidTacticalPlaybook(incoming());
+      allow delete: if isSignedIn() && (
+        isAdmin() || 
+        getUserRole(request.auth.uid) == 'coach'
       );
     }
 

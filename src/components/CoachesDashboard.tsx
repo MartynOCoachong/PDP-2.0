@@ -291,6 +291,8 @@ export default function CoachesDashboard({
   // Attendance simulator State
   const [attendanceDate, setAttendanceDate] = useState('2026-05-21');
   const [attendanceState, setAttendanceState] = useState<Record<string, boolean>>({});
+  const [isRosterExpanded, setIsRosterExpanded] = useState(true);
+  const [isPerformanceOverviewExpanded, setIsPerformanceOverviewExpanded] = useState(true);
 
   // 1. Role boundaries for data access filtering
   // Admins see everything. Associations see clubs within their ID. Clubs see teams within their ID. Teams see Coaches/Players.
@@ -401,84 +403,129 @@ export default function CoachesDashboard({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Side: Roster Listing */}
-        <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+        <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl transition-all duration-300">
+          <button
+            onClick={() => setIsRosterExpanded(!isRosterExpanded)}
+            className="w-full flex items-center justify-between focus:outline-none select-none group focus-visible:ring-1 focus-visible:ring-emerald-500 rounded-lg p-0.5 text-left"
+          >
             <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-              <Users className="w-4 h-4 text-emerald-400" />
-              Team Roster ({teamMatchesPlayers.length})
+              <Users className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Team Roster ({teamMatchesPlayers.length})</span>
             </h2>
-            <span className="text-[10px] font-mono text-slate-400 uppercase">Click to Select Player</span>
-          </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-mono text-slate-450 uppercase transition group-hover:text-slate-300 hidden sm:inline-block">
+                {isRosterExpanded ? 'Collapse' : 'Expand'}
+              </span>
+              <ChevronDown 
+                className={`w-4 h-4 text-slate-450 transition-all duration-300 ease-out shrink-0 group-hover:text-slate-300 ${
+                  isRosterExpanded ? 'transform rotate-180' : ''
+                }`} 
+              />
+            </div>
+          </button>
 
-          <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-            {teamMatchesPlayers.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 text-xs font-mono">
-                No players linked to this specific echelons level.
+          {isRosterExpanded && (
+            <div className="pt-4 border-t border-slate-800/80 mt-3 animate-fadeIn space-y-4">
+              <div className="text-[10px] font-mono text-slate-400 uppercase block tracking-wider">
+                Click to Select Player
               </div>
-            ) : (
-              teamMatchesPlayers.map((player) => {
-                const isActive = focusedPlayer?.id === player.id;
-                const speedStats = getPlayerRunSummaries(player.id);
-                return (
-                  <div
-                    key={player.id}
-                    onClick={() => {
-                      setSelectedPlayerId(player.id);
-                      setCustomHydration(latestMetric?.hydrationGoalMls || 3000);
-                    }}
-                    className={`p-3.5 rounded-xl border transition cursor-pointer text-left relative overflow-hidden flex justify-between items-center ${
-                      isActive
-                        ? 'bg-emerald-500/10 border-emerald-500/40'
-                        : 'bg-slate-950/60 hover:bg-slate-950 border-slate-850'
-                    }`}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 shrink-0" />
-                        <span className="text-sm font-sans font-semibold text-slate-100">{player.name}</span>
-                      </div>
-                      <div className="text-[11px] font-mono text-slate-450">
-                        {player.email}
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-xs font-mono font-bold text-slate-200">
-                        {speedStats.distance.toFixed(1)} km
-                      </div>
-                      <div className="text-[10px] font-mono text-emerald-400">
-                        {speedStats.count} runs logged
-                      </div>
-                    </div>
+              
+              <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                {teamMatchesPlayers.length === 0 ? (
+                  <div className="p-6 text-center text-slate-500 text-xs font-mono">
+                    No players linked to this specific echelons level.
                   </div>
-                );
-              })
-            )}
-          </div>
+                ) : (
+                  teamMatchesPlayers.map((player) => {
+                    const isActive = focusedPlayer?.id === player.id;
+                    const speedStats = getPlayerRunSummaries(player.id);
+                    return (
+                      <div
+                        key={player.id}
+                        onClick={() => {
+                          setSelectedPlayerId(player.id);
+                          setCustomHydration(latestMetric?.hydrationGoalMls || 3000);
+                        }}
+                        className={`p-3.5 rounded-xl border transition cursor-pointer text-left relative overflow-hidden flex justify-between items-center ${
+                          isActive
+                            ? 'bg-emerald-500/10 border-emerald-500/40'
+                            : 'bg-slate-950/60 hover:bg-slate-950 border-slate-850'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 shrink-0" />
+                            <span className="text-sm font-sans font-semibold text-slate-100">{player.name}</span>
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-450">
+                            {player.email}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-xs font-mono font-bold text-slate-200">
+                            {speedStats.distance.toFixed(1)} km
+                          </div>
+                          <div className="text-[10px] font-mono text-emerald-400">
+                            {speedStats.count} runs logged
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Player Metric Insights & Assignment Control */}
         {teamMatchesPlayers.length > 0 ? (
           <div className="lg:col-span-8 space-y-6">
             
-            {/* Player's Performance Metrics Cards mapped in individual accordion style */}
-            <div className="space-y-4">
-              {teamMatchesPlayers.map((player) => (
-                <PlayerPerformanceAccordion
-                  key={player.id}
-                  player={player}
-                  isExpanded={!!expandedPlayerIds[player.id]}
-                  onToggle={() => {
-                    setExpandedPlayerIds(prev => ({
-                      ...prev,
-                      [player.id]: !prev[player.id]
-                    }));
-                  }}
-                  runLogs={runLogs}
-                  playerMetrics={metrics[player.id] || []}
-                  onUpdatePlayerGoal={onUpdatePlayerGoal}
-                />
-              ))}
+            {/* Player's Performance Metrics Cards mapped in individual accordion style nested in a master Performance Overview Accordion */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl transition-all duration-300">
+              <button
+                type="button"
+                onClick={() => setIsPerformanceOverviewExpanded(!isPerformanceOverviewExpanded)}
+                className="w-full flex items-center justify-between focus:outline-none select-none group focus-visible:ring-1 focus-visible:ring-emerald-500 rounded-lg p-0.5 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-sm font-semibold text-slate-200">Performance Overview</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-mono text-slate-455 uppercase transition group-hover:text-slate-300 hidden sm:inline-block">
+                    {isPerformanceOverviewExpanded ? 'Collapse' : 'Expand'}
+                  </span>
+                  <ChevronDown 
+                    className={`w-4 h-4 text-slate-455 transition-all duration-300 ease-out shrink-0 group-hover:text-slate-300 ${
+                      isPerformanceOverviewExpanded ? 'transform rotate-180' : ''
+                    }`} 
+                  />
+                </div>
+              </button>
+
+              {isPerformanceOverviewExpanded && (
+                <div className="space-y-4 pt-4 border-t border-slate-800/80 mt-3 animate-fadeIn">
+                  {teamMatchesPlayers.map((player) => (
+                    <PlayerPerformanceAccordion
+                      key={player.id}
+                      player={player}
+                      isExpanded={!!expandedPlayerIds[player.id]}
+                      onToggle={() => {
+                        setExpandedPlayerIds(prev => ({
+                          ...prev,
+                          [player.id]: !prev[player.id]
+                        }));
+                      }}
+                      runLogs={runLogs}
+                      playerMetrics={metrics[player.id] || []}
+                      onUpdatePlayerGoal={onUpdatePlayerGoal}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Practice Session Log Card */}

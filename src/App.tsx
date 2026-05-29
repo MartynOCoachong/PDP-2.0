@@ -18,7 +18,8 @@ import {
   ModuleCompletion,
   Assignment,
   OrgProfileRequest,
-  UserRole
+  UserRole,
+  TeamFormation
 } from './types';
 import {
   INITIAL_ASSOCIATIONS,
@@ -39,6 +40,8 @@ import AssociationDashboard from './components/AssociationDashboard';
 import AuthScreen from './components/AuthScreen';
 import CoachOnboarding from './components/CoachOnboarding';
 import LeaderboardTab from './components/LeaderboardTab';
+import FormationsTab from './components/FormationsTab';
+import ParentDashboard from './components/ParentDashboard';
 
 // Firebase Client Imports
 import { db, auth, handleFirestoreError, OperationType } from './firebase';
@@ -80,11 +83,12 @@ export default function App() {
   });
 
   // Load persistent configurations or defaults
-  const [activeTab, setActiveTab ] = useState<'dashboard' | 'classroom' | 'coaches' | 'admin' | 'leaderboard'>('dashboard');
+  const [activeTab, setActiveTab ] = useState<'dashboard' | 'classroom' | 'coaches' | 'admin' | 'leaderboard' | 'formation'>('dashboard');
+  const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Cloud Sync Connection Configuration States
-  const [useFirestore, setUseFirestore] = useState<boolean>(true);
+  const [useFirestore, setUseFirestore] = useState<boolean>(() => localStorage.getItem('echelon_use_firestore') !== 'false');
   const [fireConnection, setFireConnection] = useState<'connected' | 'error' | 'testing'>('testing');
   const [syncStatusMsg, setSyncStatusMsg] = useState<string>('');
   const [seeding, setSeeding] = useState<boolean>(false);
@@ -160,6 +164,11 @@ export default function App() {
   const [requests, setRequests] = useState<OrgProfileRequest[]>(() => {
     const cached = localStorage.getItem('echelon_requests');
     return cached ? JSON.parse(cached) : INITIAL_REQUESTS;
+  });
+
+  const [formations, setFormations] = useState<TeamFormation[]>(() => {
+    const cached = localStorage.getItem('echelon_formations');
+    return cached ? JSON.parse(cached) : [];
   });
 
   // --- Firestore Real-Time Subscriptions & Connection Logic ---
@@ -269,6 +278,14 @@ export default function App() {
           snap.forEach(d => list.push(d.data() as ModuleCompletion));
           setCompletions(list);
         }, (err) => handleSubError(err, 'moduleCompletions'))
+      );
+
+      unsubscribers.push(
+        onSnapshot(collection(db, 'teamFormations'), (snap) => {
+          const list: TeamFormation[] = [];
+          snap.forEach(d => list.push(d.data() as TeamFormation));
+          setFormations(list);
+        }, (err) => handleSubError(err, 'teamFormations'))
       );
     };
 
@@ -708,6 +725,43 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('echelon_requests', JSON.stringify(requests));
   }, [requests]);
+
+  useEffect(() => {
+    localStorage.setItem('echelon_formations', JSON.stringify(formations));
+  }, [formations]);
+
+  const handleSaveFormation = async (formPayload: Omit<TeamFormation, 'updatedAt'>) => {
+    const updatedAt = new Date().toISOString();
+    const saved: TeamFormation = {
+      ...formPayload,
+      updatedAt
+    };
+
+    if (useFirestore) {
+      try {
+        await setDoc(doc(db, 'teamFormations', saved.id), saved);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `teamFormations/${saved.id}`);
+      }
+    } else {
+      setFormations((prev) => {
+        const filtered = prev.filter((f) => f.id !== saved.id);
+        return [saved, ...filtered];
+      });
+    }
+  };
+
+  const handleDeleteFormation = async (formationId: string) => {
+    if (useFirestore) {
+      try {
+        await deleteDoc(doc(db, 'teamFormations', formationId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `teamFormations/${formationId}`);
+      }
+    } else {
+      setFormations((prev) => prev.filter((f) => f.id !== formationId));
+    }
+  };
 
   // Handler helpers
   const handleSaveRun = async (newRunFields: Omit<RunLog, 'id' | 'playerId' | 'date'>) => {
@@ -1473,6 +1527,168 @@ export default function App() {
     }
   };
 
+  const handleParentSignup = async (fields: { 
+    parentName: string; 
+    parentEmail: string; 
+    parentPassword?: string;
+    playerName: string;
+    playerEmail: string; 
+    coachId?: string; 
+    staySignedIn: boolean; 
+  }) => {
+    let parentId = `user-parent-${Date.now()}`;
+    let playerId = `user-player-${Date.now()}`;
+    
+    if (useFirestore && fields.parentPassword) {
+      try {
+        const userCred = await createUserWithEmailAndPassword(auth, fields.parentEmail, fields.parentPassword);
+        parentId = userCred.user.uid;
+      } catch (err: any) {
+        console.error("Firebase Auth parent signup error:", err);
+        if (err.code === 'auth/email-already-in-use') {
+          throw new Error("This email is already registered on Echelon's security firewall.");
+        }
+        if (err.code === 'auth/operation-not-allowed') {
+          throw new Error("Email/Password Authentication is not enabled in your Firebase Console. Please go to the Firebase Console -> Authentication -> Sign-in Method, enable the 'Email/Password' provider, and then try signing up again!");
+        }
+        throw err;
+      }
+    }
+
+    let matchCoach = undefined;
+    if (fields.coachId) {
+      matchCoach = coaches.find(c => c.id === fields.coachId);
+    }
+
+    let resolvedTeamId = undefined;
+    let resolvedClubId = undefined;
+    let resolvedAssocId = undefined;
+
+    if (matchCoach) {
+      resolvedTeamId = matchCoach.teamId;
+      const matchTeam = teams.find(t => t.id === matchCoach.teamId);
+      if (matchTeam) {
+        resolvedClubId = matchTeam.clubId;
+        const matchClub = clubs.find(c => c.id === matchTeam.clubId);
+        if (matchClub) {
+          resolvedAssocId = matchClub.associationId;
+        }
+      }
+    }
+
+    const playerProfile: UserProfile = {
+      id: playerId,
+      name: fields.playerName,
+      email: fields.playerEmail,
+      role: 'player',
+      coachId: fields.coachId || undefined,
+      teamId: resolvedTeamId,
+      clubId: resolvedClubId,
+      associationId: resolvedAssocId,
+      approved: true,
+      parentUserId: parentId
+    };
+
+    const newPlayer: Player = {
+      id: playerId,
+      name: fields.playerName,
+      email: fields.playerEmail,
+      coachId: fields.coachId || '',
+      approved: true,
+      UUID: playerId,
+      player_name: fields.playerName,
+      player_email: fields.playerEmail,
+      create_at: new Date().toISOString()
+    };
+
+    const parentProfile: UserProfile = {
+      id: parentId,
+      name: fields.parentName,
+      email: fields.parentEmail,
+      role: 'parent',
+      coachId: fields.coachId || undefined,
+      teamId: resolvedTeamId,
+      clubId: resolvedClubId,
+      associationId: resolvedAssocId,
+      approved: true,
+      childPlayerId: playerId
+    };
+
+    if (useFirestore) {
+      try {
+        await setDoc(doc(db, 'users', playerId), playerProfile);
+        await setDoc(doc(db, 'players', playerId), newPlayer);
+        await setDoc(doc(db, 'users', parentId), parentProfile);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `users/${parentId}`);
+      }
+    } else {
+      setUsers(prev => [...prev, playerProfile, parentProfile]);
+      setPlayers(prev => [...prev, newPlayer]);
+    }
+
+    setCurrentProfile(parentProfile);
+    if (fields.staySignedIn) {
+      localStorage.setItem('echelon_current_profile', JSON.stringify(parentProfile));
+    }
+  };
+
+  const handleParentUpdatePlayerMetrics = async (playerId: string, fields: Partial<DailyMetrics>) => {
+    const today = '2026-05-21'; // Sim local timeline
+    
+    const records = allMetrics[playerId] || [];
+    const matchIdx = records.findIndex(r => r.date === today);
+    let targetRecord: DailyMetrics;
+
+    if (matchIdx >= 0) {
+      targetRecord = {
+        ...records[matchIdx],
+        ...fields
+      };
+    } else {
+      const defaultRecord: DailyMetrics = {
+        playerId: playerId,
+        date: today,
+        hydrationMls: 1500,
+        hydrationGoalMls: 3000,
+        sleepHours: 8,
+        sleepQuality: 'Good',
+        nutritionCalories: 1000,
+        nutritionProteinG: 60,
+        nutritionCarbsG: 120,
+        nutritionFatG: 35
+      };
+      targetRecord = {
+        ...defaultRecord,
+        ...fields
+      };
+    }
+
+    if (useFirestore) {
+      const docId = `${playerId}_${today}`;
+      try {
+        await setDoc(doc(db, 'dailyMetrics', docId), targetRecord);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `dailyMetrics/${docId}`);
+      }
+    }
+
+    setAllMetrics(prev => {
+      const existing = prev[playerId] || [];
+      const index = existing.findIndex(m => m.date === today);
+      const updatedList = [...existing];
+      if (index >= 0) {
+        updatedList[index] = targetRecord;
+      } else {
+        updatedList.push(targetRecord);
+      }
+      return {
+        ...prev,
+        [playerId]: updatedList
+      };
+    });
+  };
+
   const handleCoachSignup = async (fields: { 
     name: string; 
     email: string; 
@@ -1885,6 +2101,11 @@ export default function App() {
         users={users}
         coaches={coaches}
         teams={teams}
+        useFirestore={useFirestore}
+        onToggleFirestore={(val: boolean) => {
+          setUseFirestore(val);
+          localStorage.setItem('echelon_use_firestore', String(val));
+        }}
         onLogin={(profile, stay) => {
           setCurrentProfile(profile);
           if (stay) {
@@ -1896,6 +2117,7 @@ export default function App() {
         onPlayerSignup={handlePlayerSignup}
         onCoachSignup={handleCoachSignup}
         onAssociationSignup={handleAssociationSignup}
+        onParentSignup={handleParentSignup}
       />
     );
   }
@@ -1926,14 +2148,33 @@ export default function App() {
           {/* Logo and Brand */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <img 
-              src="https://i.ibb.co/GfHgRPwT/Untitled-design-5.png" 
+              src="https://i.ibb.co/gb9535YK/Untitled-design-6.png" 
               alt="Echelon Logo" 
               className="h-10 w-10 sm:h-12 sm:w-12 object-contain rounded-xl shadow-lg shadow-emerald-500/10"
               referrerPolicy="no-referrer"
             />
-            <h1 className="text-sm sm:text-base md:text-lg font-bold font-sans tracking-tight text-slate-100">
-              Player Development Portal
-            </h1>
+            <div className="flex flex-col text-left">
+              <h1 className="text-sm sm:text-base md:text-lg font-bold font-sans tracking-tight text-slate-100">
+                Player Development Portal
+              </h1>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${useFirestore ? 'bg-emerald-550 animate-pulse' : 'bg-indigo-405'}`} />
+                <span className="text-[9px] font-mono leading-none text-slate-400 uppercase tracking-widest">
+                  {useFirestore ? 'Cloud Synced' : 'Offline Sandbox'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextVal = !useFirestore;
+                    setUseFirestore(nextVal);
+                    localStorage.setItem('echelon_use_firestore', String(nextVal));
+                  }}
+                  className="text-[8px] font-mono font-bold leading-none text-indigo-400 hover:text-indigo-300 ml-1.5 px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 hover:bg-slate-750 transition cursor-pointer uppercase"
+                >
+                  {useFirestore ? 'Go Offline' : 'Go Online'}
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Desktop Navigation */}
@@ -2003,6 +2244,20 @@ export default function App() {
                 >
                   Leaderboard
                 </button>
+
+                {(currentProfile.role === 'player' || currentProfile.role === 'coach') && (
+                  <button
+                    onClick={() => setActiveTab('formation')}
+                    id="nav-formation"
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-sans transition ${
+                      activeTab === 'formation'
+                        ? 'bg-slate-800 text-[#00bbff] font-bold border border-slate-700'
+                        : 'text-slate-405 hover:bg-slate-850'
+                    }`}
+                  >
+                    Formation
+                  </button>
+                )}
               </>
             )}
 
@@ -2134,6 +2389,22 @@ export default function App() {
                 >
                   Leaderboard
                 </button>
+
+                {(currentProfile.role === 'player' || currentProfile.role === 'coach') && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('formation');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                      activeTab === 'formation'
+                        ? 'bg-slate-850 text-[#00bbff] border border-slate-750'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                    }`}
+                  >
+                    Formation
+                  </button>
+                )}
               </>
             )}
 
@@ -2178,18 +2449,6 @@ export default function App() {
         )}
       </header>
 
-      {/* Switching context banner indicator */}
-      <div className="bg-slate-950 border-b border-slate-900 py-2.5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 text-xs font-mono">
-          <div className="flex items-center gap-2 text-slate-400">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span>Logged profile: <b className="text-slate-200">{currentProfile.name}</b></span>
-            <span className="text-slate-700">|</span>
-            <span>Role: <b className="text-slate-200 upper">{currentProfile.role.toUpperCase()}</b></span>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-3 sm:pt-5 pb-8 space-y-6 sm:space-y-8">
         
@@ -2205,6 +2464,20 @@ export default function App() {
               onAddClub={handleAddClubDirect}
               onAddTeam={handleAddTeamDirect}
               onAddCoach={handleAddCoachDirect}
+            />
+          ) : currentProfile.role === 'parent' ? (
+            <ParentDashboard
+              parentProfile={currentProfile}
+              allPlayers={users}
+              allRunLogs={runLogs}
+              allMetrics={allMetrics}
+              allCompletions={completions}
+              modules={modules}
+              assignments={assignments}
+              coaches={coaches}
+              teams={teams}
+              formations={formations}
+              onUpdatePlayerMetrics={handleParentUpdatePlayerMetrics}
             />
           ) : isCoachingEchelon ? (
             <CoachesDashboard
@@ -2227,15 +2500,21 @@ export default function App() {
               completions={completions.filter(c => c.playerId === currentProfile.id)}
               onSaveRun={handleSaveRun}
               onUpdateDailyMetrics={handleUpdateDailyMetrics}
-              onSelectTab={(tab) => {
+              onSelectTab={(tab, formationId) => {
                 if (tab === 'classroom') {
                   setActiveTab('classroom');
+                } else if (tab === 'formation') {
+                  if (formationId) {
+                    setSelectedFormationId(formationId);
+                  }
+                  setActiveTab('formation');
                 }
               }}
               allPlayers={users}
               allRunLogs={runLogs}
               allMetrics={allMetrics}
               allCompletions={completions}
+              formations={formations}
             />
           )
         )}
@@ -2271,6 +2550,17 @@ export default function App() {
             onAddAssociation={handleAddAssociationDirect}
             onAddClub={handleAddClubDirect}
             onAddTeam={handleAddTeamDirect}
+          />
+        )}
+
+        {activeTab === 'formation' && (
+          <FormationsTab
+            currentProfile={currentProfile}
+            players={users}
+            formations={formations}
+            onSaveFormation={handleSaveFormation}
+            onDeleteFormation={handleDeleteFormation}
+            initialSelectedFormationId={selectedFormationId}
           />
         )}
 

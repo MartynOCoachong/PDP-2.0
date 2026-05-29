@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Square, Navigation, Footprints, Clock, Zap, Flame, Compass, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, Square, Navigation, Footprints, Clock, Zap, Flame, Compass, ChevronDown, ChevronUp, PlusSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { RunLog, GPSTrackPoint } from '../types';
 
@@ -33,6 +33,19 @@ export default function GPSRunTracker({ playerId, onSaveRun, activeAssignmentId,
   const [isSimulated, setIsSimulated] = useState(false);
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unsupported'>('prompt');
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [showAlternativeForm, setShowAlternativeForm] = useState(false);
+  const [altDistance, setAltDistance] = useState('');
+  const [altDurationMin, setAltDurationMin] = useState('');
+  const [alternativeSuccessMsg, setAlternativeSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (alternativeSuccessMsg) {
+      const timer = setTimeout(() => {
+        setAlternativeSuccessMsg(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [alternativeSuccessMsg]);
   
   const [startTime, setStartTime] = useState<number | null>(null);
   const [duration, setDuration] = useState(0); // seconds
@@ -246,10 +259,115 @@ export default function GPSRunTracker({ playerId, onSaveRun, activeAssignmentId,
 
   const currentSecondsSpeed = speeds.length > 0 ? speeds[speeds.length - 1] : 0;
 
+  // Coordinate mapping helpers to auto-scale actual coordinates onto the 400x220 visual canvas viewport
+  const getSingleMappedPointX = (index: number) => {
+    if (points.length === 0) return 200;
+    const lngs = points.map(p => p.longitude);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const lngRange = maxLng - minLng;
+    if (lngRange === 0) return 200;
+    
+    const paddingX = 40;
+    const width = 400;
+    const normX = (points[index].longitude - minLng) / lngRange;
+    return paddingX + normX * (width - paddingX * 2);
+  };
+
+  const getSingleMappedPointY = (index: number) => {
+    if (points.length === 0) return 110;
+    const lats = points.map(p => p.latitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const latRange = maxLat - minLat;
+    if (latRange === 0) return 110;
+    
+    const paddingY = 40;
+    const height = 220;
+    const normY = 1 - (points[index].latitude - minLat) / latRange;
+    return paddingY + normY * (height - paddingY * 2);
+  };
+
+  const getMappedPathPoints = () => {
+    if (points.length === 0) return '';
+    const lats = points.map(p => p.latitude);
+    const lngs = points.map(p => p.longitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    
+    const latRange = maxLat - minLat;
+    const lngRange = maxLng - minLng;
+    
+    if (latRange === 0 || lngRange === 0) return '';
+    
+    const paddingX = 40;
+    const paddingY = 40;
+    const width = 400;
+    const height = 220;
+    
+    return points.map(p => {
+      const normX = (p.longitude - minLng) / lngRange;
+      const normY = 1 - (p.latitude - minLat) / latRange;
+      const x = paddingX + normX * (width - paddingX * 2);
+      const y = paddingY + normY * (height - paddingY * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+  };
+
+  const getMilestonePoints = () => {
+    if (points.length < 3) return [];
+    const markers: { x: number; y: number; label: string }[] = [];
+    let cumulativeDist = 0;
+    let nextMilestone = 1; // 1km, 2km, 3km...
+    
+    for (let i = 1; i < points.length; i++) {
+      const segDist = calculateDistanceKm(
+        points[i-1].latitude,
+        points[i-1].longitude,
+        points[i].latitude,
+        points[i].longitude
+      );
+      cumulativeDist += segDist;
+      
+      if (cumulativeDist >= nextMilestone) {
+        const x = getSingleMappedPointX(i);
+        const y = getSingleMappedPointY(i);
+        markers.push({
+          x,
+          y,
+          label: `${nextMilestone}K`
+        });
+        nextMilestone++;
+        if (markers.length >= 6) break;
+      }
+    }
+    return markers;
+  };
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden transition-all">
       {/* Background glow styling */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+      
+      {/* Subtle Translucent Gray Street Grid Mapping the entire widget background (Reference image Yorkville style) */}
+      <div className="absolute inset-0 opacity-[0.07] pointer-events-none select-none">
+        <svg className="w-full h-full text-slate-300" viewBox="0 0 400 220" preserveAspectRatio="none">
+          <g fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M30,5 L30,215" />
+            <path d="M130,5 L160,215" />
+            <path d="M240,30 L240,215" strokeWidth="10" />
+            <path d="M120,40 L245,40" strokeWidth="6" />
+            <path d="M140,65 L245,65" strokeWidth="5" />
+            <path d="M5,100 C60,110 100,125 150,135" />
+            <path d="M5,70 L130,110" />
+            <path d="M130,110 L180,105 L210,115 L240,95" />
+            <path d="M240,120 C290,132 340,115 390,40" />
+            <path d="M5,200 L395,200" strokeWidth="12" />
+          </g>
+        </svg>
+      </div>
       
       <div 
         onClick={() => { if (!isRunning) setIsCollapsed(!isCollapsed); }}
@@ -270,7 +388,7 @@ export default function GPSRunTracker({ playerId, onSaveRun, activeAssignmentId,
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 relative">
           {activeAssignmentId && requiredDistanceKm && (
             <div className="bg-amber-500/10 border border-amber-500/20 px-3.5 py-1.5 rounded-xl text-xs text-amber-300 font-mono">
               🎯 Target Run: <span className="font-bold text-amber-200">{requiredDistanceKm.toFixed(1)} km</span>
@@ -289,6 +407,29 @@ export default function GPSRunTracker({ playerId, onSaveRun, activeAssignmentId,
         </div>
       </div>
 
+      <AnimatePresence>
+        {alternativeSuccessMsg && (
+          <motion.div 
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            className="mb-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3.5 rounded-xl flex items-center justify-between gap-2.5 text-xs font-medium relative z-20"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span>{alternativeSuccessMsg}</span>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setAlternativeSuccessMsg(null)}
+              className="text-emerald-500/60 hover:text-emerald-400 text-[10px] font-bold uppercase tracking-wider pl-2"
+            >
+              Dismiss
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence initial={false}>
         {(!isCollapsed || isRunning) && (
           <motion.div
@@ -296,35 +437,123 @@ export default function GPSRunTracker({ playerId, onSaveRun, activeAssignmentId,
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="overflow-hidden"
+            className="overflow-hidden relative"
           >
             {!isRunning ? (
-              <div className="flex flex-col items-center justify-center p-8 bg-slate-950/60 rounded-xl border border-slate-800/80">
-                <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4">
-                  <Navigation className="w-8 h-8 text-emerald-400 animate-bounce" />
-                </div>
+              showAlternativeForm ? (
+                <div className="w-full flex flex-col p-6 bg-slate-950/60 rounded-xl border border-slate-800/80 relative overflow-hidden">
+                  <h3 className="text-slate-200 font-semibold text-sm mb-1 self-start">Submit Alternative Workout Record</h3>
+                  <p className="text-slate-400 text-xs mb-4 text-left">
+                    Manual override submission if active GPS connection is unavailable.
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-450 uppercase mb-1.5">Distance (km)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="e.g. 5.10"
+                        value={altDistance}
+                        onChange={(e) => setAltDistance(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:border-amber-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-450 uppercase mb-1.5">Duration (mins)</label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        placeholder="e.g. 25"
+                        value={altDurationMin}
+                        onChange={(e) => setAltDurationMin(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 font-mono focus:outline-none focus:border-amber-500/50"
+                      />
+                    </div>
+                  </div>
 
-                <h3 className="text-slate-200 font-medium text-base mb-1.5">Ready to Track Workout</h3>
-                <p className="text-slate-400 text-xs text-center max-w-sm mb-6 leading-relaxed">
-                  Ensure device location services are enabled. Permissions status: 
-                  <span className="font-semibold text-emerald-400 ml-1">
-                    {permissionState === 'granted' ? 'Allowed' : permissionState === 'denied' ? 'Blocked (Reset in Browser)' : 'Checking...'}
-                  </span>
-                </p>
+                  <div className="flex gap-2.5 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAlternativeForm(false);
+                        setAltDistance('');
+                        setAltDurationMin('');
+                      }}
+                      className="bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-semibold px-4 py-2 rounded-lg transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const dist = parseFloat(altDistance);
+                        const mins = parseFloat(altDurationMin);
+                        if (isNaN(dist) || dist <= 0 || isNaN(mins) || mins <= 0) {
+                          return;
+                        }
+                        const durationSeconds = Math.round(mins * 60);
+                        const avgSpeed = parseFloat(((dist / (durationSeconds / 3600))).toFixed(2));
+                        
+                        onSaveRun({
+                          durationSeconds,
+                          distanceKm: dist,
+                          avgSpeedKmH: avgSpeed,
+                          maxSpeedKmH: parseFloat((avgSpeed * 1.25).toFixed(2)),
+                          minSpeedKmH: parseFloat((avgSpeed * 0.75).toFixed(2)),
+                          gpsTrackPoints: [],
+                          fromAssignmentId: activeAssignmentId
+                        });
 
-                <div className="flex justify-center w-full">
-                  <button
-                    onClick={() => startRun(false)}
-                    id="btn-start-real-run"
-                    className="w-full max-w-sm bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition"
-                  >
-                    <Play className="w-4 h-4 fill-slate-950" />
-                    Start GPS Run
-                  </button>
+                        setAlternativeSuccessMsg(`Successfully logged workout: ${dist.toFixed(2)} km in ${mins} mins stored in run history.`);
+                        setShowAlternativeForm(false);
+                        setAltDistance('');
+                        setAltDurationMin('');
+                      }}
+                      className="bg-[#00bbff] hover:bg-[#009be0] text-slate-950 text-xs font-bold px-4 py-2 rounded-lg transition shadow-md shadow-sky-500/10"
+                    >
+                      Confirm Record
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center p-8 bg-slate-950/60 rounded-xl border border-slate-800/80 relative overflow-hidden">
+                  <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4">
+                    <Navigation className="w-8 h-8 text-emerald-400 animate-bounce" />
+                  </div>
+
+                  <h3 className="text-slate-200 font-medium text-base mb-1.5">Ready to Track Workout</h3>
+                  <p className="text-slate-400 text-xs text-center max-w-sm mb-6 leading-relaxed">
+                    Ensure device location services are enabled. Permissions status: 
+                    <span className="font-semibold text-emerald-400 ml-1">
+                      {permissionState === 'granted' ? 'Allowed' : permissionState === 'denied' ? 'Blocked (Reset in Browser)' : 'Checking...'}
+                    </span>
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm justify-center">
+                    <button
+                      onClick={() => startRun(false)}
+                      id="btn-start-real-run"
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition text-xs sm:text-sm"
+                    >
+                      <Play className="w-4 h-4 fill-slate-950" />
+                      Start GPS Run
+                    </button>
+                    <button
+                      onClick={() => setShowAlternativeForm(true)}
+                      id="btn-start-sim-run"
+                      className="flex-1 bg-[#00bbff] hover:bg-[#009be0] text-slate-950 font-bold px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition text-xs sm:text-sm shadow-md shadow-sky-500/10"
+                    >
+                      <PlusSquare className="w-4.5 h-4.5 text-slate-950" />
+                      Submit An Alternative
+                    </button>
+                  </div>
+                </div>
+              )
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-6 relative">
                 {/* Running Dashboard Metrics */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-slate-950/80 border border-slate-850 p-4 rounded-xl flex items-center gap-3">
@@ -402,6 +631,144 @@ export default function GPSRunTracker({ playerId, onSaveRun, activeAssignmentId,
                   </div>
                 )}
 
+                {/* Styled Street Map with Transparent Grey Road Lines */}
+                <div className="relative w-full h-[240px] bg-slate-950 rounded-xl overflow-hidden border border-slate-850 flex items-center justify-center shadow-inner">
+                  {/* Subtle Grid Pattern Overlay */}
+                  <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:16px_16px]" />
+                  
+                  <svg className="absolute inset-0 w-full h-full text-slate-700/60" viewBox="0 0 400 220" preserveAspectRatio="none">
+                    {/* Route Glow Filter */}
+                    <defs>
+                      <filter id="routeGlow" x="-10%" y="-10%" width="120%" height="120%">
+                        <feGaussianBlur stdDeviation="2" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                      </filter>
+                    </defs>
+
+                    {/* Toronto Yorkville Styled Grey Road Lines (Thick, Semi-Transparent Background) */}
+                    <g opacity="0.6">
+                      {/* Spadina Ave */}
+                      <path d="M30,5 L30,215" stroke="currentColor" strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/70" />
+                      {/* Avenue Rd */}
+                      <path d="M130,5 L160,215" stroke="currentColor" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/70" />
+                      {/* Yonge St */}
+                      <path d="M240,30 L240,215" stroke="currentColor" strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/70" />
+                      {/* MacPherson Ave */}
+                      <path d="M120,40 L245,40" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/60" />
+                      {/* Roxborough St */}
+                      <path d="M140,65 L245,65" stroke="currentColor" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/60" />
+                      {/* Davenport Rd */}
+                      <path d="M5,100 C60,110 100,125 150,135" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/50" />
+                      {/* Dupont St */}
+                      <path d="M5,70 L130,110" stroke="currentColor" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/50" />
+                      {/* Pears Ave */}
+                      <path d="M130,110 L180,105 L210,115 L240,95" stroke="currentColor" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/65" />
+                      {/* Aylmer Ave */}
+                      <path d="M240,120 C290,132 340,115 390,40" stroke="currentColor" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/50" />
+                      {/* Cumberland Ave */}
+                      <path d="M160,180 L230,170" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/60" />
+                      {/* Yorkville Ave */}
+                      <path d="M210,150 L250,145" stroke="currentColor" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/60" />
+                      {/* Bloor St */}
+                      <path d="M5,200 L395,200" stroke="currentColor" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" className="text-slate-850/80" />
+                    </g>
+
+                    {/* Street Inner Fine Lines for realistic vector map mapping */}
+                    <g opacity="0.35">
+                      <path d="M30,5 L30,215" stroke="#475569" strokeWidth="1.5" />
+                      <path d="M130,5 L160,215" stroke="#475569" strokeWidth="1.5" />
+                      <path d="M240,30 L240,215" stroke="#475569" strokeWidth="1.5" />
+                      <path d="M120,40 L245,40" stroke="#475569" strokeWidth="1.5" />
+                      <path d="M140,65 L245,65" stroke="#475569" strokeWidth="1.5" />
+                      <path d="M5,100 C60,110 100,125 150,135" stroke="#475569" strokeWidth="1.5" />
+                      <path d="M5,70 L130,110" stroke="#475569" strokeWidth="1.5" />
+                      <path d="M130,110 L180,105 L210,115 L240,95" stroke="#475569" strokeWidth="1.5" />
+                      <path d="M240,120 C290,132 340,115 390,40" stroke="#475569" strokeWidth="1.5" />
+                      <path d="M160,180 L230,170" stroke="#475569" strokeWidth="1" />
+                      <path d="M210,150 L250,145" stroke="#475569" strokeWidth="1" />
+                      <path d="M5,200 L395,200" stroke="#475569" strokeWidth="2.5" />
+                    </g>
+
+                    {/* Street Names (Low opacity, clean design font styling) */}
+                    <g className="select-none font-mono text-[6px] font-semibold tracking-wider text-slate-500/50 fill-current">
+                      <text x="18" y="100" transform="rotate(-85 18 100)">SPADINA AVE</text>
+                      <text x="141" y="90" transform="rotate(82 141 90)">AVENUE RD</text>
+                      <text x="234" y="100" transform="rotate(90 234 100)">YONGE ST</text>
+                      <text x="210" y="208">BLOOR ST</text>
+                      <text x="160" y="34">MACPHERSON AVE</text>
+                      <text x="165" y="59">ROXBOROUGH ST W</text>
+                      <text x="160" y="112">PEARS AVE</text>
+                      <text x="60" y="112" transform="rotate(8 60 112)">DAVENPORT RD</text>
+                      <text x="45" y="81" transform="rotate(18 45 81)">DUPONT ST</text>
+                      <text x="280" y="132" transform="rotate(-6 280 132)">AYLMER AVE</text>
+                    </g>
+
+                    {/* Active Track Path - Vibrantly Colored Glowing Line */}
+                    {points.length > 1 && (
+                      <polyline
+                        points={getMappedPathPoints()}
+                        fill="none"
+                        stroke="#facc15" /* Vibrant Nike-Yellow corresponding to reference picture path */
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        filter="url(#routeGlow)"
+                        className="drop-shadow-[0_0_6px_rgba(250,204,21,0.6)]"
+                      />
+                    )}
+
+                    {/* Start Pointer Badge */}
+                    {points.length > 0 && (() => {
+                      const firstX = getSingleMappedPointX(0);
+                      const firstY = getSingleMappedPointY(0);
+                      return (
+                        <g>
+                          <circle cx={firstX} cy={firstY} r="6" fill="#ffffff" stroke="#facc15" strokeWidth="1.5" />
+                          <circle cx={firstX} cy={firstY} r="2" fill="#1e293b" />
+                          <text x={firstX} y={firstY - 8} textAnchor="middle" className="fill-slate-100 font-mono text-[6px] font-bold">START</text>
+                        </g>
+                      );
+                    })()}
+
+                    {/* Milestone markers along the trail (e.g. 1K, 2K, 3K, like the image) */}
+                    {points.length > 2 && getMilestonePoints().map((milestone, idx) => (
+                      <g key={idx}>
+                        <circle cx={milestone.x} cy={milestone.y} r="7" fill="#ffffff" stroke="#1e293b" strokeWidth="1.5" />
+                        <text x={milestone.x} y={milestone.y + 2} textAnchor="middle" className="fill-slate-900 font-bold font-sans text-[5.5px]">
+                          {milestone.label}
+                        </text>
+                      </g>
+                    ))}
+
+                    {/* Present Coordinates Pulsing Dot + Logo Pointer */}
+                    {points.length > 0 ? (() => {
+                      const lastX = getSingleMappedPointX(points.length - 1);
+                      const lastY = getSingleMappedPointY(points.length - 1);
+                      return (
+                        <g>
+                          {/* Pulsing Glow Base Ring */}
+                          <circle cx={lastX} cy={lastY} r="10" fill="rgba(56,189,248,0.25)" className="animate-ping" style={{ transformOrigin: `${lastX}px ${lastY}px` }} />
+                          {/* Deep Blue/Indigo Circular Run Logo */}
+                          <circle cx={lastX} cy={lastY} r="8" fill="#1e3a8a" stroke="#ffffff" strokeWidth="1.5" />
+                          
+                          {/* Inner pointer detail */}
+                          <path d={`M${lastX - 2},${lastY} L${lastX},${lastY - 2} L${lastX + 2},${lastY} M${lastX - 2},${lastY + 2} L${lastX},${lastY} L${lastX + 2},${lastY + 2}`} stroke="#38bdf8" strokeWidth="1" strokeLinecap="round" fill="none" />
+                        </g>
+                      );
+                    })() : (
+                      /* Standby State: Draw a nice preview message */
+                      <g className="select-none pointer-events-none">
+                        <text x="200" y="105" textAnchor="middle" className="fill-slate-500/70 font-sans text-[9px] font-bold tracking-widest uppercase">
+                          No Active Route Plot
+                        </text>
+                        <text x="200" y="118" textAnchor="middle" className="fill-slate-600/60 font-sans text-[7.5px]">
+                          Pulsing GPS beacons will write to coordinates live
+                        </text>
+                      </g>
+                    )}
+                  </svg>
+                </div>
+
                 {/* Map/Track simulation indicators */}
                 <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-850 text-xs flex justify-between items-center font-mono text-slate-400">
                   <div className="flex items-center gap-2">
@@ -441,3 +808,4 @@ export default function GPSRunTracker({ playerId, onSaveRun, activeAssignmentId,
     </div>
   );
 }
+

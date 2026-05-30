@@ -474,6 +474,30 @@ export default function PlayerDashboard({
                     </motion.div>
                   )}
                 </div>
+
+                {/* TEAM TACTICS & ANIMATIONS row */}
+                <div className="bg-slate-950 rounded-xl border border-slate-850 hover:border-sky-500/30 transition duration-150 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sessionStorage.setItem('scroll_to_tactical_playbook', 'true');
+                      onSelectTab('formation', lastFormation.id);
+                    }}
+                    className="w-full text-left p-3.5 flex justify-between items-center bg-slate-950 hover:bg-slate-900/40 transition cursor-pointer select-none"
+                  >
+                    <span className="text-[10px] uppercase font-mono text-slate-400 tracking-wider flex items-center gap-1.5 font-bold">
+                      <Layers className="w-3.5 h-3.5 text-sky-400" />
+                      Team Tactics & Animations
+                    </span>
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex items-center gap-1 bg-amber-500/15 text-amber-400 border border-amber-500/25 px-2 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider font-bold animate-pulse">
+                        <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
+                        High Importance
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    </div>
+                  </button>
+                </div>
               </div>
             )}
           </div>

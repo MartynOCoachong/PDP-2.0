@@ -298,6 +298,37 @@ export default function FormationsTab({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Scrolling effect for tactical/playbook animator scroll requests with interval retries and header offset
+  React.useEffect(() => {
+    if (sessionStorage.getItem('scroll_to_tactical_playbook') === 'true') {
+      let attempts = 0;
+      const interval = setInterval(() => {
+        const el = document.getElementById('tactical-simulator-workspace');
+        if (el) {
+          clearInterval(interval);
+          sessionStorage.removeItem('scroll_to_tactical_playbook');
+          
+          // Calculate target Y position accounting for sticky header offset
+          const headerOffset = 90; // Approx height of sticky header + top margin
+          const elementPosition = el.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+          
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+          });
+        }
+        attempts++;
+        if (attempts >= 40) { // Timeout after 4 seconds
+          clearInterval(interval);
+          sessionStorage.removeItem('scroll_to_tactical_playbook');
+        }
+      }, 100);
+
+      return () => clearInterval(interval);
+    }
+  }, []);
+
   // List search or selected filters
   const [loadedFormationId, setLoadedFormationId] = useState<string | null>(null);
   const [hasAutoLoaded, setHasAutoLoaded] = useState(false);

@@ -2272,23 +2272,6 @@ export default function App() {
               <h1 className="text-sm sm:text-base md:text-lg font-bold font-sans tracking-tight text-slate-100">
                 Player Development Portal
               </h1>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className={`w-1.5 h-1.5 rounded-full ${useFirestore ? 'bg-emerald-550 animate-pulse' : 'bg-indigo-405'}`} />
-                <span className="text-[9px] font-mono leading-none text-slate-400 uppercase tracking-widest">
-                  {useFirestore ? 'Cloud Synced' : 'Offline Sandbox'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextVal = !useFirestore;
-                    setUseFirestore(nextVal);
-                    localStorage.setItem('echelon_use_firestore', String(nextVal));
-                  }}
-                  className="text-[8px] font-mono font-bold leading-none text-indigo-400 hover:text-indigo-300 ml-1.5 px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 hover:bg-slate-750 transition cursor-pointer uppercase"
-                >
-                  {useFirestore ? 'Go Offline' : 'Go Online'}
-                </button>
-              </div>
             </div>
           </div>
 

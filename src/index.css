@@ -23,6 +23,15 @@
 /* Base custom resets/style overrides to ensure absolute pristine contrast */
 html,
 body,
+#root {
+  max-width: 100%;
+  width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+html,
+body,
 #root,
 .bg-slate-950 {
   background-color: #080808 !important;

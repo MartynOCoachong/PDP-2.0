@@ -40,7 +40,9 @@ import {
   BookOpen,
   CheckCircle,
   HelpCircle,
-  FolderOpen
+  FolderOpen,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { UserProfile } from '../types';
 
@@ -130,6 +132,7 @@ export default function TacticalAnimator({ currentProfile }: Props) {
   // Playbooks loaded from Firebase + combined with fallbacks
   const [playbooks, setPlaybooks] = useState<TacticalPlaybook[]>(PRESET_DRILLS_FALLBACK);
   const [activePlaybookId, setActivePlaybookId] = useState<string>('preset_overlap_cross');
+  const [isSelectionCollapsed, setIsSelectionCollapsed] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -613,83 +616,152 @@ export default function TacticalAnimator({ currentProfile }: Props) {
 
       {/* Database selection cards grid or table listing assigned animations */}
       <div className="space-y-2.5">
-        <label className="text-[10px] font-mono text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-1">
-          <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
-          Select Playbook Activity File
-        </label>
-        
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-          {visiblePlaybooks.length === 0 ? (
-            <div className="col-span-1 md:col-span-2 p-6 rounded-xl border border-dashed border-slate-800 bg-slate-950/20 text-center text-slate-400 space-y-1 py-10">
-              <p className="text-xs font-semibold text-slate-300">No Tactical Playbooks Available</p>
-              <p className="text-[10px] text-slate-500">Your coaching staff has not published any custom animation set pieces yet. Check back later!</p>
-            </div>
-          ) : (
-            visiblePlaybooks.map((p) => {
-              const isSelected = p.id === activePlaybookId;
-              const isSystemPreset = p.id?.startsWith('preset_');
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => p.id && setActivePlaybookId(p.id)}
-                  className={`p-3.5 rounded-xl border text-left cursor-pointer transition flex justify-between items-start gap-4 relative group ${
-                    isSelected
-                      ? 'bg-sky-950/20 border-sky-500/40 shadow-inner'
-                      : 'bg-slate-950/40 border-slate-850 hover:bg-slate-950/70 hover:border-slate-800'
-                  }`}
-                >
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`text-[9px] font-mono leading-none tracking-wider font-semibold uppercase px-1.5 py-0.5 rounded ${
-                        isSystemPreset 
-                          ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
-                          : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      }`}>
-                        {isSystemPreset ? 'Template' : 'Team Custom'}
-                      </span>
-                      <span className="text-[9px] font-mono text-slate-500">
-                        {p.fieldRatio === 'third' ? '1/3 Pitch' : p.fieldRatio === 'half' ? '1/2 Pitch' : 'Full Pitch'}
-                      </span>
-                      <span className={`text-[8px] font-mono px-1.5 rounded uppercase ${
-                        p.difficulty === 'Advanced' 
-                          ? 'text-rose-400 border border-rose-500/20 bg-rose-500/5' 
-                          : 'text-amber-400 border border-amber-500/20 bg-amber-500/5'
-                      }`}>
-                        {p.difficulty}
-                      </span>
-                    </div>
-
-                    <h4 className={`text-xs font-bold leading-tight ${isSelected ? 'text-slate-150' : 'text-slate-350'}`}>
-                      {p.title}
-                    </h4>
-                    <p className="text-[10.5px] text-slate-400 leading-normal line-clamp-2 md:line-clamp-1">
-                      {p.description}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0 self-center">
-                    {/* Delete Option for non presets only */}
-                    {isCoach && (
-                      <button
-                        type="button"
-                        onClick={(e) => p.id && handleDeletePlaybook(p.id, e)}
-                        className="p-1.5 rounded bg-slate-900 border border-slate-850 text-slate-500 hover:text-rose-400 hover:border-rose-950 transition cursor-pointer"
-                        title="Delete Playbook"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition ${
-                      isSelected ? 'border-sky-500 bg-sky-500/10 text-sky-400' : 'border-slate-800 text-slate-600'
-                    }`}>
-                      <CheckCircle className="w-3 h-3" />
-                    </div>
-                  </div>
+        {isSelectionCollapsed && activePlaybook ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+            <div className="min-w-0 flex-1 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-sky-950/40 border border-sky-500/20 flex items-center justify-center shrink-0">
+                <FolderOpen className="w-5 h-5 text-sky-400" />
+              </div>
+              <div className="min-w-0 pr-2">
+                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                  <span className="text-[9px] uppercase font-mono font-bold text-sky-400 tracking-wider">
+                    Selected Activity
+                  </span>
+                  <span className="text-slate-600 font-mono text-[9px]">•</span>
+                  <span className={`text-[8px] font-mono leading-none font-semibold uppercase px-1.5 py-0.5 rounded ${
+                    activePlaybook.id?.startsWith('preset_') 
+                      ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
+                      : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  }`}>
+                    {activePlaybook.id?.startsWith('preset_') ? 'Template' : 'Team Custom'}
+                  </span>
+                  <span className="text-[8.5px] font-mono text-slate-450">
+                    {activePlaybook.fieldRatio === 'third' ? '1/3 Pitch' : activePlaybook.fieldRatio === 'half' ? '1/2 Pitch' : 'Full Pitch'}
+                  </span>
+                  <span className={`text-[8px] font-mono px-1.5 rounded uppercase ${
+                    activePlaybook.difficulty === 'Advanced' 
+                      ? 'text-rose-400 border border-rose-500/20 bg-rose-500/5' 
+                      : 'text-amber-400 border border-amber-500/20 bg-amber-500/5'
+                  }`}>
+                    {activePlaybook.difficulty}
+                  </span>
                 </div>
-              );
-            })
-          )}
-        </div>
+                <h4 className="text-xs sm:text-sm font-bold text-slate-100 truncate">
+                  {activePlaybook.title}
+                </h4>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsSelectionCollapsed(false)}
+              className="px-3 py-1.5 bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-sky-500/30 text-[10.5px] font-mono font-bold uppercase rounded-lg transition shrink-0 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.98]"
+            >
+              <span>Change Animation</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-[10px] font-mono text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
+                Select Playbook Activity File
+              </label>
+              {activePlaybook && (
+                <button
+                  type="button"
+                  onClick={() => setIsSelectionCollapsed(true)}
+                  className="px-2 py-1 bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 border border-slate-800 text-[9px] font-mono uppercase rounded-lg transition flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Collapse List</span>
+                  <ChevronUp className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {visiblePlaybooks.length === 0 ? (
+                <div className="col-span-1 md:col-span-2 p-6 rounded-xl border border-dashed border-slate-800 bg-slate-950/20 text-center text-slate-400 space-y-1 py-10">
+                  <p className="text-xs font-semibold text-slate-300">No Tactical Playbooks Available</p>
+                  <p className="text-[10px] text-slate-500">Your coaching staff has not published any custom animation set pieces yet. Check back later!</p>
+                </div>
+              ) : (
+                visiblePlaybooks.map((p) => {
+                  const isSelected = p.id === activePlaybookId;
+                  const isSystemPreset = p.id?.startsWith('preset_');
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => {
+                        if (p.id) {
+                          setActivePlaybookId(p.id);
+                          setIsSelectionCollapsed(true);
+                        }
+                      }}
+                      className={`p-3.5 rounded-xl border text-left cursor-pointer transition flex justify-between items-start gap-4 relative group ${
+                        isSelected
+                          ? 'bg-sky-950/20 border-sky-500/40 shadow-inner'
+                          : 'bg-slate-950/40 border-slate-850 hover:bg-slate-950/70 hover:border-slate-800'
+                      }`}
+                    >
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-[9px] font-mono leading-none tracking-wider font-semibold uppercase px-1.5 py-0.5 rounded ${
+                            isSystemPreset 
+                              ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          }`}>
+                            {isSystemPreset ? 'Template' : 'Team Custom'}
+                          </span>
+                          <span className="text-[9px] font-mono text-slate-500">
+                            {p.fieldRatio === 'third' ? '1/3 Pitch' : p.fieldRatio === 'half' ? '1/2 Pitch' : 'Full Pitch'}
+                          </span>
+                          <span className={`text-[8px] font-mono px-1.5 rounded uppercase ${
+                            p.difficulty === 'Advanced' 
+                              ? 'text-rose-400 border border-rose-500/20 bg-rose-500/5' 
+                              : 'text-amber-400 border border-amber-500/20 bg-amber-500/5'
+                          }`}>
+                            {p.difficulty}
+                          </span>
+                        </div>
+
+                        <h4 className={`text-xs font-bold leading-tight ${isSelected ? 'text-slate-150' : 'text-slate-350'}`}>
+                          {p.title}
+                        </h4>
+                        <p className="text-[10.5px] text-slate-400 leading-normal line-clamp-2 md:line-clamp-1">
+                          {p.description}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0 self-center">
+                        {/* Delete Option for non presets only */}
+                        {isCoach && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (p.id) handleDeletePlaybook(p.id, e);
+                            }}
+                            className="p-1.5 rounded bg-slate-900 border border-slate-850 text-slate-500 hover:text-rose-400 hover:border-rose-950 transition cursor-pointer"
+                            title="Delete Playbook"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition ${
+                          isSelected ? 'border-sky-500 bg-sky-500/10 text-sky-400' : 'border-slate-800 text-slate-600'
+                        }`}>
+                          <CheckCircle className="w-3 h-3" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Notifications Banners */}
@@ -736,23 +808,6 @@ export default function TacticalAnimator({ currentProfile }: Props) {
                       </p>
                     </div>
                   )}
-
-                  <div className="grid grid-cols-2 gap-2 text-[10.5px] border-t border-slate-850 pt-3">
-                    <div className="space-y-0.5">
-                      <span className="text-slate-500 block text-[9.5px] uppercase font-mono">Difficulty Level</span>
-                      <span className="font-semibold text-amber-400 flex items-center gap-1">
-                        <Award className="w-3.5 h-3.5" />
-                        {difficulty || 'Intermediate'}
-                      </span>
-                    </div>
-                    <div className="space-y-0.5">
-                      <span className="text-slate-500 block text-[9.5px] uppercase font-mono">Arrangement</span>
-                      <span className="font-semibold text-slate-300 flex items-center gap-1">
-                        <Activity className="w-3.5 h-3.5" />
-                        {fieldRatio === 'third' ? '1/3 Pitch' : fieldRatio === 'half' ? '1/2 Pitch' : 'Full Pitch'}
-                      </span>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Quick Interactive Hints */}

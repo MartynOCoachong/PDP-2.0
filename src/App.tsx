@@ -2261,15 +2261,15 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex justify-between items-center gap-4">
           
           {/* Logo and Brand */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <img 
               src="https://i.ibb.co/gb9535YK/Untitled-design-6.png" 
               alt="Echelon Logo" 
-              className="h-10 w-10 sm:h-12 sm:w-12 object-contain rounded-xl shadow-lg shadow-emerald-500/10"
+              className="h-8 w-8 sm:h-12 sm:w-12 object-contain rounded-xl shadow-lg shadow-emerald-500/10 shrink-0"
               referrerPolicy="no-referrer"
             />
-            <div className="flex flex-col text-left">
-              <h1 className="text-sm sm:text-base md:text-lg font-bold font-sans tracking-tight text-slate-100">
+            <div className="flex flex-col text-left min-w-0">
+              <h1 className="text-xs sm:text-base md:text-lg font-bold font-sans tracking-tight text-slate-100 truncate sm:overflow-visible">
                 Player Development Portal
               </h1>
             </div>
